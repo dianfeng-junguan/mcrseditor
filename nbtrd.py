@@ -1,6 +1,4 @@
 import python_nbt.nbt as nbt
-import json
-import sys
 import threading
 class structure:
     def __init__(self,x=48,y=48,z=48):
@@ -86,15 +84,8 @@ def fill_subtask(x1,y1,z1,x2,y2,z2,type,struct:structure,semaphore:list):
     semaphore[0]+=1
 class blocks(enumerate):
     BLOCK_STONE=0
-if len(sys.argv)<2:
-    print('err: no input nbt.')
-    sys.exit(-1)
+    BLOCK_REDSTONE=1
+    BLOCK_REPETITOR=2
+    BLOCK_REDSTONE_TORCH=3
+    BLOCK_LEVER=4
 
-
-data=nbt.read_from_nbt_file(sys.argv[1])
-jsondat=nbt.NBTTagBase.json_obj(data,full_json=True)
-temp=structure()
-temp.add_to_palette(blocks.BLOCK_STONE,temp.create_blockstate('minecraft:stone'))
-temp.fill(0,0,0,3,3,48,blocks.BLOCK_STONE)
-# print(temp.get_nbt())
-nbt.write_to_nbt_file('output.nbt',temp.get_nbt())
