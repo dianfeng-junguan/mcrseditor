@@ -9,7 +9,17 @@ class Element:
         self.name=name
         self.value=value
         self.prop=prop
-        pass
+        self.parent=None
+        self.child=[]
+    def append(self,ch):
+        self.child.append(ch)
+    def drop(self,ch):
+        self.child.remove(ch)
+    def __str__(self):
+        return f'<{self.name} {self.prop}>'
+    
+    def __repr__(self):
+        return f'<{self.name} {self.prop}>'
 def skipspace(text,start)->int:
     '''返回第一个不是空白字符的下标'''
     i=start
@@ -57,24 +67,52 @@ def fetch(text:str,st:int):
     i+=1
     return Element(name,0,prop),i
 
-    
+
     
 def tree(path):
     text=open(path).read()
-    text=re.sub(u"[\x00-\x08\x0b-\x0c\x0e-\x1f]+",u"",text)
-    print(text)
-    root=et.fromstring(text)
-    recurse(root)
+    ptr=0
+    els=[]
+    el:Element
+    el,ptr=fetch(text,ptr)
+    print(f'<{el.name} {el.prop}>')
+    while el!=None:
+        els.append(el)
+        print(f'<{el.name} {el.prop}>')
+        el,ptr=fetch(text,ptr)
+    # print(els)
+    #开始构建树结构
+    root=None
+    parent:Element=None
+    indent=0
+    fl=0
+    for e in els:
+        e:Element
+        if e.name in ['Qucs','Properties','Wires','Components','Diagrams','Symbol','Paintings']:
+            #添加层级
+            indent+=4
+            fl=1
+            if parent!=None:
+                parent.append(e)
+            e.parent=parent
+            parent=e
+            if root==None:
+                root=parent
+        elif e.name[0]=='/':
+            parent=parent.parent
+            indent-=4
+        if fl==1:
+            fl=0
+            for i in range(indent-4):
+                print(' ',end='')
+        else:
+            for i in range(indent):
+                print(' ',end='')
+        print(e.name)
+    
+            
 def recurse(node:et.Element):
     for ch in node:
         print(ch)
         recurse(ch)
-text=open('rs.sch').read()
-# print(text)
-ptr=0
-el:Element
-el,ptr=fetch(text,ptr)
-print(f'<{el.name} {el.prop}>')
-while el!=None:
-    print(f'<{el.name} {el.prop}>')
-    el,ptr=fetch(text,ptr)
+tree('rs.sch')
