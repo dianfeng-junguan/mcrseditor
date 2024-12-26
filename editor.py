@@ -7,6 +7,7 @@ print('editor')
 comps={}
 cons=[]
 helpstr="cmds:\n\
+    port [name]\n\
     and/not/or [name]\n\
     con/connect [c1] [c2]\n\
     br/break [c1] [c2]\n\
@@ -18,22 +19,14 @@ helpstr="cmds:\n\
 def solve(cmd:str)->int:
     '''
     解析命令
-    cmds:
-    and/not/or [name]
-    con/connect [c1] [c2]
-    br/break [c1] [c2]
-    save [path]
-    open [path]
-    help
-    show
     '''
-    global comps
+    global comps,cons
     args=cmd.strip().split(' ')
     first=args[0].lower()
-    if first in ['and','not','or']:
+    if first in ['and','not','or','port']:
         if args[1] in comps:
             print('%s already exists, overwriting previous one...'%(args[1]))
-        comps[args[1]]={'type':args[0],'in':[],'out':[]}
+        comps[args[1]]={'type':args[0],'in':0,'out':0}
     elif first in ['con','connect']:
         #连接
         if len(args)<3:
@@ -44,25 +37,19 @@ def solve(cmd:str)->int:
         if not a in comps.keys() or not b in comps.keys():
             print('one or two component(s) not found')
             return False
-        outs:list=comps[a]['out']
-        ins:list=comps[b]['in']
-        if not b in outs:
-            outs.append(b)
-        if not a in ins:
-            ins.append(a)
+        if not (a,b) in cons:
+            #有向连接，out->in
+            cons.append((a,b))
+            comps[a]['out']+=1
+            comps[b]['in']+=1
     elif first=='show':
         print('components:')
         for c in comps.keys():
             print(c,comps[c]['type'],end='\t')
         print('\nconnections:')
-        for c,v in comps.items():
-            v:dict
-            for wv in v['out']:
-                print('%s->%s, '%(c,wv),end='')
+        for tup in cons:
+            print('%s->%s, '%(tup[0],tup[1]),end='')
             print()
-            # for wv in v['in']:
-            #     print('%s->%s, '%(wv,c),end='')
-            # print()
     elif first in ['br','break']:
         #断开
         if len(args)<3:
@@ -73,16 +60,15 @@ def solve(cmd:str)->int:
         if not a in comps.keys() or not b in comps.keys():
             print('one or two component(s) not found')
             return False
-        outs:list=comps[a]['out']
-        ins:list=comps[b]['in']
-        if b in outs:
-            outs.remove(b)
-        if a in ins:
-            ins.remove(a)
+        if (a,b) in cons:
+            #有向连接，out->in
+            cons.remove((a,b))
+            comps[a]['out']-=1
+            comps[b]['in']-=1
     elif first=='help':
         print(helpstr)
     elif first=='save':
-        js=json.dumps(comps,indent=2)
+        js=json.dumps({'components':comps,'connections':cons},indent=2)
         if len(args)<2:
             print('need path')
             return False
@@ -95,7 +81,9 @@ def solve(cmd:str)->int:
             return False
         with open(args[1],'r') as f:
             js=f.read()
-            comps=json.loads(js)
+            data=json.loads(js)
+            comps=data['components']
+            cons=data['connections']
         print('loaded')
     elif first in ['q','exit']:
         return True

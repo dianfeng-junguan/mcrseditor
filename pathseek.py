@@ -2,6 +2,7 @@ from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import multiprocessing
 import noise
 '''
 寻路算法，用来连接两个端口
