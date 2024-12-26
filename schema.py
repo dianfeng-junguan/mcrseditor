@@ -4,7 +4,7 @@
 '''
 import xml.etree.ElementTree as et
 import re
-class Element:
+class SchemaElement:
     def __init__(self,name,value,prop):
         self.name=name
         self.value=value
@@ -17,9 +17,30 @@ class Element:
         self.child.remove(ch)
     def __str__(self):
         return f'<{self.name} {self.prop}>'
-    
+    def get(self,name):
+        '''
+        获取child
+        '''
+        for comp in self.child:
+            comp:SchemaElement
+            if comp.name==name:
+                return comp
+        return None
     def __repr__(self):
         return f'<{self.name} {self.prop}>'
+#<type name active x y xtext ytext mirrorX rotate "Value1" visible "Value2" visible ...>
+class SchemaComponent:
+    def __init__(self,type=None,name=None,inc:int=2):
+        '''
+        inc:输入端口数
+        '''
+        self.type=type
+        self.name=name
+        self.inc=inc
+        pass
+    def __repr__(self):
+        return '%s(%s),input port num=%d'%(self.name,self.type,self.inc)
+        pass
 def skipspace(text,start)->int:
     '''返回第一个不是空白字符的下标'''
     i=start
@@ -65,15 +86,15 @@ def fetch(text:str,st:int):
         #没有遇到>就结束了
         return (None,None)
     i+=1
-    return Element(name,0,prop),i
+    return SchemaElement(name,0,prop),i
 
 
     
-def tree(path):
+def read_schema(path):
     text=open(path).read()
     ptr=0
     els=[]
-    el:Element
+    el:SchemaElement
     el,ptr=fetch(text,ptr)
     print(f'<{el.name} {el.prop}>')
     while el!=None:
@@ -83,11 +104,11 @@ def tree(path):
     # print(els)
     #开始构建树结构
     root=None
-    parent:Element=None
+    parent:SchemaElement=None
     indent=0
     fl=0
     for e in els:
-        e:Element
+        e:SchemaElement
         if e.name in ['Qucs','Properties','Wires','Components','Diagrams','Symbol','Paintings']:
             #添加层级
             indent+=4
@@ -101,6 +122,9 @@ def tree(path):
         elif e.name[0]=='/':
             parent=parent.parent
             indent-=4
+        else:
+            #2nd level
+            parent.append(e)
         if fl==1:
             fl=0
             for i in range(indent-4):
@@ -109,10 +133,59 @@ def tree(path):
             for i in range(indent):
                 print(' ',end='')
         print(e.name)
+    return root
+#<type name active x y xtext ytext mirrorX rotate "Value1" visible "Value2" visible ...>
+def get_components(tree:SchemaElement)->list:
+    '''
+    从树结构中获取部件
+    tree:总树
+    '''
+    l=[]
+    for comp in tree.child:
+        comp:SchemaElement
+        if comp.name=='Components':
+            for com in comp.child:
+                com:SchemaElement
+                ins=com.prop[8]
+                ins:str
+                inc=int(ins[1:-1])#remove "
+                l.append(SchemaComponent(com.name,com.prop[0],inc))
+            break
+    return l
+def get_connections(tree:SchemaElement,comps:list)->list:
+    '''
+    获取各个部件之间的连接
+    '''
+    webs={}
+    points=[]
+    trwires:SchemaElement=tree.get('Wires')
+    for w in trwires.child:
+        w:SchemaElement
+        pts=[w.name]+w.prop[:3]
+        #转int
+        for i in range(4):
+            pts[i]=int(pts[i])
+        p1=pts[:2]
+        p2=pts[2:]
+        #这两个点是相连的
+        if not p1 in webs:
+            webs[p1]=[p2]
+        elif not p2 in webs[p1]:
+            webs[p1].append(p2)
+        
+        if not p2 in webs:
+            webs[p2]=[p1]
+        elif not p1 in webs[p2]:
+            webs[p2].append(p1)
     
-            
+        
+        
 def recurse(node:et.Element):
     for ch in node:
         print(ch)
         recurse(ch)
-tree('rs.sch')
+root=read_schema('rs.sch')
+comps=get_components(root)
+con=get_connections(root,comps)
+print(comps)
+
