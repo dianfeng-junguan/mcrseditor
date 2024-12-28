@@ -102,11 +102,58 @@ class Map:
                     return minpath
             i+=1
         return None
-
+    def path_astar(self,x1,y1,z1,x2,y2,z2)->list:
+        '''
+        a*算法。
+        '''
+        self.__bfstmp.clear()
+        if not self.contains(x1,y1,z1) or not self.contains(x2,y2,z2):
+            return None
+        #六个方向
+        dir=[[0,0,1],[0,0,-1],[0,1,0],[0,-1,0],[1,0,0],[-1,0,0]]
+        #路径
+        minlen=10**8
+        cur=[x1,y1,z1,-1]#第四个量代表父路径点
+        minpath=[]
+        self.__bfstmp.append(cur)
+        i=0
+        while len(self.__bfstmp)>i:
+            f=self.__bfstmp[i]
+            to_add=[]
+            gh=[]
+            for d in dir:
+                n=[f[0]+d[0],f[1]+d[1],f[2]+d[2],i]
+                if self.accessible(n) and not self.bfs_contains(n):
+                    to_add.append(n)
+                    gh.append(self.__gh((x1,y1,z1),n[:3],(x2,y2,z2)))
+                if n[:3]==[x2,y2,z2]:
+                    node=n
+                    while node[3]!=-1:
+                        minpath.insert(0,node)
+                        node=self.__bfstmp[node[3]]
+                    return minpath
+            #排序
+            for ig in range(len(gh)):
+                for jg in range(len(gh)-1-ig):
+                    if gh[jg]>gh[jg+1]:
+                        gh[jg],gh[jg+1]=gh[jg+1],gh[jg]
+                        to_add[jg],to_add[jg+1]=to_add[jg+1],to_add[jg]
+            self.__bfstmp+=to_add
+            i+=1
+        return None
+    def __gh(self,pst,pcu,pen)->int:
+        #g+h
+        g=0
+        for i in range(3):
+            g+=abs(pcu[i]-pst[i])
+        h=0
+        for i in range(3):
+            g+=abs(pcu[i]-pen[i])
+        return g+h
 if __name__=='__main__':
     #测试代码
     # 创建一个新的图形
-    SIZE=10
+    SIZE=20
     fig=plt.figure()
     ax=fig.add_subplot(projection='3d')
     map=Map(SIZE,SIZE,SIZE)
@@ -118,7 +165,7 @@ if __name__=='__main__':
                 if r>=0.7 and not (x,y,z)==(0,0,0) and not (x,y,z)==(SIZE-1,SIZE-1,SIZE-1):
                     map.add_obstacle(x,y,z)
                     ax.scatter(xs=x,ys=y,zs=z,s=30,marker='.',c='g',depthshade=True)
-    p=map.path_bfs(SIZE/2,0,0,SIZE-1,SIZE-1,SIZE-1)
+    p=map.path_astar(SIZE/2,0,0,SIZE-1,SIZE-1,SIZE-1)
     # print('deepest recurse:',map.max_recurse)
     if p==None:
         print('no path found')

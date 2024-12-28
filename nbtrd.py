@@ -1,5 +1,6 @@
 import python_nbt.nbt as nbt
 import threading
+import multiprocessing
 class structure:
     def __init__(self,x=48,y=48,z=48):
         self.data=nbt.NBTTagCompound()
