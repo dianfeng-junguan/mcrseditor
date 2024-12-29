@@ -27,8 +27,11 @@ class structure:
         yy=nbt.NBTTagInt(y)
         zz=nbt.NBTTagInt(z)
         blk['pos']=nbt.NBTTagList(value=[xx,yy,zz],tag_type=nbt.NBTTagInt)
-        if not blk in self.blocks:
-            self.data['blocks'].append(blk)
+        #查重
+        for b in self.blocks:
+            if b['pos']==blk['pos']:
+                self.blocks.remove(b)
+        self.blocks.append(blk)
     def add_to_palette(self,index:int,blockstate:nbt.NBTTagCompound)->None:
         self.palette.insert(index,blockstate)
     def resize(self,x,y,z):

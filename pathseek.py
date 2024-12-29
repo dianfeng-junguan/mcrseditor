@@ -135,6 +135,8 @@ class Map:
         open_list=[]#open list
         open_list.append(cur)
         while len(open_list)>0:
+            if len(self.__bfstmp)>3000:
+                print('warning:path seeking taking more than 3000 steps')
             f=open_list.pop(0)
             self.__bfstmp.append(f)
             # print('distance:',self.__gh((x1,y1,z1),f[:3],(x2,y2,z2)))

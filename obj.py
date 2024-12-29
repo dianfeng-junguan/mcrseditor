@@ -27,6 +27,20 @@ def vec_add(l1,l2)->list:
     for i in range(len(l1)):
         res.append(l1[i]+l2[i])
     return res
+def translate_dir(dir:str)->list:
+    if dir.strip().lower()=='x+':
+        return [1,0,0]
+    elif dir.strip().lower()=='x-':
+        return [-1,0,0]
+    elif dir.strip().lower()=='y-':
+        return [0,1,0]
+    elif dir.strip().lower()=='y+':
+        return [0,-1,0]
+    elif dir.strip().lower()=='z+':
+        return [0,0,1]
+    elif dir.strip().lower()=='z-':
+        return [0,0,-1]
+    return None
 if __name__=="__main__":
     with open(sys.argv[1],'r') as f:
         global data
@@ -42,15 +56,16 @@ if __name__=="__main__":
     def overlap(p1:tuple,s1:tuple,p2:tuple,s2:tuple)->bool:
         return ()
     px=10
-    
     pz=10
+    sz=[10,48,10]
     c=0
     lnc=int(len(comps)**0.5)
     for k,v in comps.items():
         v:dict
         typ=v['type']
         #in:input c out:output c
-        id=typ+'_'+str(v['in'])+'_'+str(v['out'])
+        #寻找相应的门
+        id=typ#+'_'+str(v['in'])+'_'+str(v['out'])
         path='lib/'+id+'.json'
         if len(glob.glob(path))==0:
             print('error: gate not found:',id)
@@ -65,15 +80,18 @@ if __name__=="__main__":
         size:list=used_gates[id]['data']['size']
         #需要一个布局算法
         #方阵排列
-        gatemap[k]={'id':id,'gate':used_gates[id]['data']['path'],'pos':[px,10,pz],'in':v['in']\
+        gatemap[k]={'id':id,'gate':used_gates[id]['data']['path'],'pos':[px,0,pz],'in':v['in']\
                     ,'out':v['out']}
         port_rest[k]={'in':v['in'],'out':v['out']}
         c+=1
+        sz[1]=max(sz[1],size[1])
         if c%lnc==0:
             px=4
             pz+=size[2]+10
+            sz[2]=max(sz[2],pz)
         else:
             px+=size[0]+10
+            sz[0]=max(sz[0],px)
     mp=pathseek.Map(48,48,48)
     struct=nbtrd.structure(48,48,48)
     all_palette=[struct.create_blockstate("minecraft:stone"),struct.create_blockstate("minecraft:redstone_wire",nbt.NBTTagCompound())]
@@ -119,7 +137,7 @@ if __name__=="__main__":
             rx=g['pos'][0]+bx
             ry=g['pos'][1]+by
             rz=g['pos'][2]+bz
-            # mp.add_obstacle(rx,ry,rz)
+            mp.add_obstacle(rx,ry,rz)
             struct.setblock(rx,ry,rz,newi)
             
     max_concurrent=12
@@ -133,16 +151,19 @@ if __name__=="__main__":
         touse_a,touse_b=port_rest[a]['out']-1,port_rest[b]['in']-1
         port_rest[a]['out']-=1
         port_rest[b]['in']-=1
-        outp=vec_add(used_gates[aid]['data']['out'][touse_a],gatemap[a]['pos'])
-        inp=vec_add(used_gates[bid]['data']['in'][touse_b],gatemap[b]['pos'])
+        outp=vec_add(used_gates[aid]['data']['out'][touse_a][:3],gatemap[a]['pos'])
+        inp=vec_add(used_gates[bid]['data']['in'][touse_b][:3],gatemap[b]['pos'])
 
         #寻路连接
-        print(outp,'to',inp)
+        print(aid,'to',bid,end=':')
         conpath=mp.path_astar(outp[0],outp[1],outp[2],inp[0],inp[1],inp[2])
-        print(conpath)
-        for i in conpath:
-            mp.add_obstacle(i[0],i[1],i[2])
-            mp.add_obstacle(i[0],i[1]-1,i[2])
+        print('ok')
+        for i in conpath:#[0,1,0],
+            #四周都需要为空，不能有其他红石线连接
+            for d in [[0,0,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]]:
+                iv=vec_add(i,d)
+                mp.add_obstacle(iv[0],iv[1],iv[2])
+            # mp.add_obstacle(i[0],i[1]-1,i[2])
             struct.setblock(i[0],i[1],i[2],nbtrd.blocks.BLOCK_REDSTONE)
             struct.setblock(i[0],i[1]-1,i[2],nbtrd.blocks.BLOCK_STONE)
         #分配任务
