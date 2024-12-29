@@ -112,6 +112,10 @@ def draw_gate(gate,rect):
     pygame.draw.rect(buffer,(100,100,100),(rect[0],rect[1],rect[2],rect[3]),\
                     width=3)
     font=pygame.font.SysFont('arial',15)
+    for p in gates[gate]['ports']:
+        dp=[p[0]*BLOCK_RENDERW+rect[0],p[2]*BLOCK_RENDERW+rect[1],BLOCK_RENDERW,BLOCK_RENDERW]
+        pygame.draw.rect(buffer,(200,200,100),dp)
+        
     buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,(10,10)))
 def deal_sel(curpos:tuple[int,int]):
     '''
@@ -145,8 +149,17 @@ def addline(p1,p2):
     '''
     p1,p2应该是以方块为单位的坐标
     '''
-    l=p1+[p2[0]-p1[0],p2[1]-p1[1]]
-    conn.append(l[-1:])
+    dh=p2[0]-p1[0]
+    dv=p2[1]-p1[1]
+    if dh<0:
+        dh=-dh+1
+        p1[0]-=dh
+    if dv<0:
+        dv=-dv+1
+        p1[1]-=dv
+    l=p1+[dh,dv]
+    
+    conn.append(l)
 #鼠标模式:=gate为放置门电路
 def put_gate(type:str):
     global selgate,selmode
@@ -218,7 +231,7 @@ def export(path:str):
                 rx=sub['rect'][0]+bx
                 ry=1+by
                 #sub['rect'][1]
-                rz=sub['rect'][2]+bz
+                rz=sub['rect'][1]+bz
                 struct.setblock(rx,ry,rz,newi)
         for lc in conn:
             #连接线
@@ -227,9 +240,9 @@ def export(path:str):
                 struct.setblock(rx,1,rz,1)
                 struct.setblock(rx,0,rz,0)
                 if lc[3]:
-                    rx+=1
-                else:
                     rz+=1
+                else:
+                    rx+=1
         with open(path,'wb') as f:
             nbt.write_to_nbt_file(f,struct.get_nbt())
         print('done')
@@ -272,8 +285,8 @@ if __name__=='__main__':
     gatemenu.bind_all("<e>",lambda arg:put_gate('not'))
 
     editmenu.add_cascade(label='Add Gate',menu=gatemenu)
-    editmenu.add_command(label='Add Line',command=put_line,accelerator="Ctrl+l")
-    gatemenu.bind_all("<Control-l>",lambda arg:put_line())
+    editmenu.add_command(label='Add Line',command=put_line,accelerator="Ctrl+f")
+    gatemenu.bind_all("<Control-f>",lambda arg:put_line())
     # 将下拉菜单添加到顶层菜单项
     menubar.add_cascade(label='Files', menu=filemenu)
     menubar.add_cascade(label='Edit', menu=editmenu)
@@ -337,7 +350,11 @@ if __name__=='__main__':
         elif selmode=='line2':
             i=0 if linedir=='h' else 1
             length=linep2[i]-linep1[i]
-            pygame.draw.rect(buffer,(255,255,255),linep1+[length if not i else BLOCK_RENDERW,length if i else BLOCK_RENDERW])
+            st=copy.deepcopy(linep1)
+            if length<0:
+                length=-length
+                st[i]-=length-BLOCK_RENDERW
+            pygame.draw.rect(buffer,(255,255,255),st+[length if not i else BLOCK_RENDERW,length if i else BLOCK_RENDERW])
                 
         screen.blit(buffer,(0,0))
         pygame.display.flip()  #对显示窗口进行更新，默认窗口全部重绘
