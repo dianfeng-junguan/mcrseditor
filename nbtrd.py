@@ -67,10 +67,10 @@ class structure:
         if dz%thz>0:
             #有余数，留给最后一个进程
             taskz[-1]+=dz%thz
-        
+        #这里用不了多进程，似乎nbt库里面的lambda会导致报错
         ths=[threading.Thread(target=fill_subtask, \
-                              args=(x1,y1,stz[i],x2,y2,stz[i]+taskz[i],\
-                                    type,self,finished),daemon=True) for i in range(threadc)]
+                              args=[x1,y1,stz[i],x2,y2,stz[i]+taskz[i],\
+                                    type,self,finished],daemon=True) for i in range(threadc)]
         for t in ths:
             t.start()
         while finished[0]<threadc:
@@ -81,7 +81,7 @@ def fill_subtask(x1,y1,z1,x2,y2,z2,type,struct:structure,semaphore:list):
             # print('done %d,%d'%(x,y))
             for z in range(z1,z2):
                 struct.setblock(x,y,z,type)
-    print('thread done')
+    print('task done')
     semaphore[0]+=1
 class blocks(enumerate):
     BLOCK_STONE=0

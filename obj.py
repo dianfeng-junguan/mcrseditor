@@ -123,7 +123,7 @@ if __name__=="__main__":
                     struct.setblock(i[0],i[1],i[2],nbtrd.blocks.BLOCK_STONE)
         #TODO 按路径放置方块
 
-    print(gatemap)
+    # print(gatemap)
     nbt.write_to_nbt_file(sys.argv[2],struct.get_nbt())
     print('done')
 
