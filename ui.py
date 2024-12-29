@@ -4,17 +4,80 @@ import json
 import copy
 import nbtrd
 import python_nbt.nbt as nbt
+import tkinter as tk
+import os
 from queue import Queue
 
-comm=Queue(32)#两个线程通信用
-
+comm=Queue(32)#两个线程通信用 cmd2display
+com_dis2cmd=Queue(32)#display2cmd
 def display_thread():
-    pygame.init()  #内部各功能模块进行初始化创建及变量设置，默认调用
+    selmode=''
+    selgate=''
+    # pygame.init()  #内部各功能模块进行初始化创建及变量设置，默认调用
+    # pygame.display.set_caption("MCrs")  #设置显示窗口的标题内容，是一个字符串类型
     size = width,height = 800,600  #设置游戏窗口大小，分别是宽度和高度
-    screen = pygame.display.set_mode(size)  #初始化显示窗口
-    pygame.display.set_caption("MCrs")  #设置显示窗口的标题内容，是一个字符串类型
     BLOCK_RENDERW=20
+    #tkinter内嵌pygame 以便于加gui
+    tkroot=tk.Tk()
+    frame=tk.Frame(tkroot,width=width,height=height)
+    frame.pack()
+    os.environ['SDL_WINDOWID'] = str(frame.winfo_id())
+    os.environ['SDL_VIDEODRIVER'] = 'windib'
+    tkroot.update()
+    #菜单栏# 创建顶层菜单
+    menubar = tk.Menu(tkroot)
+
+    # 添加菜单项
+    
+    filemenu=tk.Menu(menubar)
+    filemenu.add_command(label='Open')
+    filemenu.add_command(label='Save')
+    filemenu.add_command(label='New')
+
+    editmenu=tk.Menu(menubar)
+    gatemenu=tk.Menu(editmenu)
+    gatemenu.add_command(label='And',accelerator='shift+a',command=lambda :put_gate('and'))
+    gatemenu.add_command(label='Or',accelerator='shift+o' ,command=lambda :put_gate('or'))
+    gatemenu.add_command(label='Not',accelerator='shift+n',command=lambda :put_gate('not'))
+
+    editmenu.add_cascade(label='Add Gate',menu=gatemenu)
+    # 将下拉菜单添加到顶层菜单项
+    menubar.add_cascade(label='Files', menu=filemenu)
+    menubar.add_cascade(label='Edit', menu=editmenu)
+
+    # 显示菜单
+    tkroot.config(menu=menubar)
+
+    pygame.display.init()
+    pygame.font.init()
+    screen = pygame.display.set_mode(size)  #初始化显示窗口
+    
+    def draw_gate(gate,rect):
+        pygame.draw.rect(screen,(100,100,100),(rect[0],rect[1],rect[0]+rect[2],rect[1]+rect[3]),\
+                         width=3)
+        font=pygame.font.SysFont('arial',15)
+        screen.blit(font.render(gate,True,(255,255,255)),vadd(rect,(10,10)))
+    def deal_sel(curpos:tuple[int,int]):
+        nonlocal selgate,selmode
+        '''
+        处理鼠标模式（放置门etc)
+        '''
+        blkpos=(int(curpos[0]/BLOCK_RENDERW),int(curpos[1]/BLOCK_RENDERW))
+        if selmode=='gate':
+            com_dis2cmd.put('gate '+selgate+" %d,%d"%(blkpos[0],blkpos[1]))
+        #清空状态
+        selmode=''
+    
+    #鼠标模式:=gate为放置门电路
+    def put_gate(type:str):
+        nonlocal selmode,selgate
+        '''
+        在界面中放置门
+        '''
+        selgate=type
+        selmode='gate'
     while True:  #无限循环，直到Python运行时退出结束
+        
         if not comm.empty():
             #有来自cmd的消息
             data:list=comm.get()
@@ -27,19 +90,26 @@ def display_thread():
             elif data[0]=='update':
                 pygame.display.update()
             elif data[0]=='gate':
-                rect=[e*BLOCK_RENDERW for e in data[2]]
-                pygame.draw.rect(screen,(100,100,100),(rect[0],rect[1],rect[0]+rect[2],rect[1]+rect[3]),\
-                                 width=3)
-                font=pygame.font.SysFont('arial',15)
-                screen.blit(font.render(data[1],True,(255,255,255)),vadd(rect,(10,10)))
+                # rect=[e*BLOCK_RENDERW for e in data[2]]
+                # pygame.draw.rect(screen,(100,100,100),(rect[0],rect[1],rect[0]+rect[2],rect[1]+rect[3]),\
+                #                  width=3)
+                # font=pygame.font.SysFont('arial',15)
+                # screen.blit(font.render(data[1],True,(255,255,255)),vadd(rect,(10,10)))
+                draw_gate(data[1],rect)
                 #TODO 绘制端口位置
 
 
         for event in pygame.event.get():  #从Pygame的事件队列中取出事件，并从队列中删除该事件
             if event.type == pygame.QUIT:  #获得事件类型，并逐类响应
                 return
-                
+            elif event.type==pygame.MOUSEMOTION:
+                curpos=pygame.mouse.get_pos()
+                if selmode=='gate':
+                    draw_gate(selgate,curpos+tuple(gates[selgate]['size']))
+            elif event.type==pygame.MOUSEBUTTONDOWN:
+                deal_sel(pygame.mouse.get_pos())
         pygame.display.update()  #对显示窗口进行更新，默认窗口全部重绘
+        tkroot.update()
 
 
 helper="help\t\
@@ -87,7 +157,7 @@ def solve(cmd:str):
         comm.put(['gate',args[1],pos+gt['size']])
     elif args[0] in ['q','exit','quit']:
         comm.put('q')
-        return
+        sys.exit()
     elif args[0]=='save':
         if len(args)<2:
             args.append(curf)
@@ -193,6 +263,7 @@ if __name__=='__main__':
     displayth=threading.Thread(target=display_thread,daemon=True)
     displayth.start()
     while True:
-        cmd=input('cmd:')
-        solve(cmd)
+        # cmd=input('cmd:')
+        if not com_dis2cmd.empty():
+            solve(com_dis2cmd.get())
 
