@@ -41,7 +41,11 @@ if __name__=="__main__":
     port_rest={}#num of in/out unused
     def overlap(p1:tuple,s1:tuple,p2:tuple,s2:tuple)->bool:
         return ()
-    px=0
+    px=10
+    
+    pz=10
+    c=0
+    lnc=int(len(comps)**0.5)
     for k,v in comps.items():
         v:dict
         typ=v['type']
@@ -55,19 +59,33 @@ if __name__=="__main__":
             used_gates[id]={'path':path}
             with open(path,'r') as f:
                 used_gates[id]['data']=json.load(f)
+                used_gates[id]['nbt']=nbt.read_from_nbt_file(open(used_gates[id]['data']['path'],'rb'))
         v['type']=id
         #place gate
         size:list=used_gates[id]['data']['size']
         #需要一个布局算法
-        #按x排列
-        gatemap[k]={'id':id,'gate':used_gates[id]['data']['path'],'pos':[px,0,0],'in':v['in']\
+        #方阵排列
+        gatemap[k]={'id':id,'gate':used_gates[id]['data']['path'],'pos':[px,10,pz],'in':v['in']\
                     ,'out':v['out']}
         port_rest[k]={'in':v['in'],'out':v['out']}
-        px+=size[0]+5
-    mp=pathseek.Map(px,48,48)
-    struct=nbtrd.structure(px,48,48)
+        c+=1
+        if c%lnc==0:
+            px=4
+            pz+=size[2]+10
+        else:
+            px+=size[0]+10
+    mp=pathseek.Map(48,48,48)
+    struct=nbtrd.structure(48,48,48)
+    all_palette=[struct.create_blockstate("minecraft:stone"),struct.create_blockstate("minecraft:redstone_wire",nbt.NBTTagCompound())]
+    all_palette[1]['Properties']['power']=nbt.NBTTagInt(0)
+    all_palette[1]['Properties']['north']=nbt.NBTTagString('none')
+    all_palette[1]['Properties']['south']=nbt.NBTTagString('none')
+    all_palette[1]['Properties']['east']= nbt.NBTTagString('none')
+    all_palette[1]['Properties']['west']= nbt.NBTTagString('none')
     struct.add_to_palette(nbtrd.blocks.BLOCK_STONE,struct.create_blockstate("minecraft:stone"))
-    print(used_gates)
+    struct.add_to_palette(nbtrd.blocks.BLOCK_REDSTONE,all_palette[1])
+    for e in gatemap.values():
+        print(e['id'],':',e['pos'])
     '''
     TODO
     1.计算所需大小生成structure
@@ -76,15 +94,34 @@ if __name__=="__main__":
     4.部件放置到结构中
     '''
     for g in gatemap.values():
-        #TODO 完成这个函数
-        for x in range(used_gates[g['id']]['data']['size'][0]):
-            for y in range(used_gates[g['id']]['data']['size'][1]):
-                for z in range(used_gates[g['id']]['data']['size'][2]):
-                    rx=g['pos'][0]+x
-                    ry=g['pos'][1]+y
-                    rz=g['pos'][2]+z
-                    mp.add_obstacle(rx,ry,rz)
-                    struct.setblock(rx,ry,rz,nbtrd.blocks.BLOCK_STONE)
+        '''
+        获取nbt
+        获取nbt.blocks
+        获取palette
+        获取palette对应方块名对应id
+        setblock
+        '''
+        schemanbt:nbt.NBTTagCompound=used_gates[g['id']]['nbt']
+        blks:nbt.NBTTagList=schemanbt['blocks']
+        pal:nbt.NBTTagList=schemanbt['palette']
+        base=len(all_palette)
+        for pv in range(len(pal)):
+            all_palette.append(pal[pv])
+            struct.add_to_palette(pv+base,pal[pv])
+        for b in blks:
+            b:nbt.NBTTagCompound
+            bpos:nbt.NBTTagList=b['pos']
+            #pos
+            bx,by,bz=bpos[0].value,bpos[1].value,bpos[2].value
+            #palette
+            state=b['state'].value
+            newi=state+base
+            rx=g['pos'][0]+bx
+            ry=g['pos'][1]+by
+            rz=g['pos'][2]+bz
+            # mp.add_obstacle(rx,ry,rz)
+            struct.setblock(rx,ry,rz,newi)
+            
     max_concurrent=12
     queue=multiprocessing.Queue(12)
     pool=[]
@@ -101,26 +138,34 @@ if __name__=="__main__":
 
         #寻路连接
         print(outp,'to',inp)
+        conpath=mp.path_astar(outp[0],outp[1],outp[2],inp[0],inp[1],inp[2])
+        print(conpath)
+        for i in conpath:
+            mp.add_obstacle(i[0],i[1],i[2])
+            mp.add_obstacle(i[0],i[1]-1,i[2])
+            struct.setblock(i[0],i[1],i[2],nbtrd.blocks.BLOCK_REDSTONE)
+            struct.setblock(i[0],i[1]-1,i[2],nbtrd.blocks.BLOCK_STONE)
         #分配任务
-        pool.append(multiprocessing.Process(target=task_path,args=\
-                                            [outp[0],outp[1],outp[2],inp[0],inp[1],inp[2],mp,queue],daemon=True))
-    done=0
-    working=0
-    p=0
-    while done<len(pool):
-        if working<max_concurrent and p<len(pool):
-            pool[p].start()
-            p+=1
-            working+=1
-        else:
-            recv=queue.get()
-            if len(recv)>0:
-                conpath=recv#mp.path_bfs(outp[0],outp[1],outp[2],inp[0],inp[1],inp[2])
-                print(conpath)
-                working-=1
-                done+=1
-                for i in conpath:
-                    struct.setblock(i[0],i[1],i[2],nbtrd.blocks.BLOCK_STONE)
+        # pool.append(multiprocessing.Process(target=task_path,args=\
+        #                                     [outp[0],outp[1],outp[2],inp[0],inp[1],inp[2],mp,queue],daemon=True))
+    # done=0
+    # working=0
+    # p=0
+    # while done<len(pool):
+    #     if working<max_concurrent and p<len(pool):
+    #         pool[p].start()
+    #         p+=1
+    #         working+=1
+    #     else:
+    #         recv=queue.get()
+    #         if len(recv)>0:
+    #             conpath=recv#mp.path_bfs(outp[0],outp[1],outp[2],inp[0],inp[1],inp[2])
+    #             print(conpath)
+    #             working-=1
+    #             done+=1
+    #             for i in conpath:
+    #                 struct.setblock(i[0],i[1],i[2],nbtrd.blocks.BLOCK_REDSTONE)
+    #                 struct.setblock(i[0],i[1]-1,i[2],nbtrd.blocks.BLOCK_STONE)
         #TODO 按路径放置方块
 
     # print(gatemap)

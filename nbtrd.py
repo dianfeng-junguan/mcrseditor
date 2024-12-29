@@ -39,7 +39,7 @@ class structure:
     def create_blockstate(name:str,properties:nbt.NBTTagCompound=None)->nbt.NBTTagCompound:
         state=nbt.NBTTagCompound()
         state['Name']=nbt.NBTTagString(name)
-        if not properties==None:
+        if not (properties is None):
             state['Properties']=properties
         return state
     def get_type(self,name:str)->int:

@@ -102,6 +102,16 @@ class Map:
                     return minpath
             i+=1
         return None
+    def manhattan(self,x1,y1,z1,x2,y2,z2)->int:
+        return abs(x1-x2)+abs(y1-y2)+abs(z1-z2)
+    def __point_find(open_list,point)->int:
+        '''
+        只比较前三项（坐标），返回下标
+        '''
+        for i in range(len(open_list)):
+            if open_list[i][:3]==point[:3]:
+                return i
+        return -1
     def path_astar(self,x1,y1,z1,x2,y2,z2)->list:
         '''
         a*算法。
@@ -113,33 +123,46 @@ class Map:
         dir=[[0,0,1],[0,0,-1],[0,1,0],[0,-1,0],[1,0,0],[-1,0,0]]
         #路径
         minlen=10**8
-        cur=[x1,y1,z1,-1]#第四个量代表父路径点
+        cur=[x1,y1,z1,-1,0,0,0]#第四个量代表父路径点,第五个量是G,6th=h,7th=g+h
+        INDEX_PARENT=3
+        INDEX_G=4
+        INDEX_H=5
+        INDEX_F=6
+        cur[INDEX_H]=self.manhattan(x1,y1,z1,x2,y2,z2)
+        cur[INDEX_F]=cur[INDEX_H]
         minpath=[]
-        self.__bfstmp.append(cur)
-        i=0
-        while len(self.__bfstmp)>i:
-            f=self.__bfstmp[i]
-            to_add=[]
-            gh=[]
+        #__bfstmp is the close list
+        open_list=[]#open list
+        open_list.append(cur)
+        while len(open_list)>0:
+            f=open_list.pop(0)
+            self.__bfstmp.append(f)
+            # print('distance:',self.__gh((x1,y1,z1),f[:3],(x2,y2,z2)))
             for d in dir:
-                n=[f[0]+d[0],f[1]+d[1],f[2]+d[2],i]
-                if self.accessible(n) and not self.bfs_contains(n):
-                    to_add.append(n)
-                    gh.append(self.__gh((x1,y1,z1),n[:3],(x2,y2,z2)))
+                n=[f[0]+d[0],f[1]+d[1],f[2]+d[2],len(self.__bfstmp)-1,0,0,0]
                 if n[:3]==[x2,y2,z2]:
                     node=n
-                    while node[3]!=-1:
-                        minpath.insert(0,node)
-                        node=self.__bfstmp[node[3]]
+                    while node[INDEX_PARENT]:
+                        minpath.insert(0,node[:3])
+                        node=self.__bfstmp[node[INDEX_PARENT]]
                     return minpath
-            #排序
-            for ig in range(len(gh)):
-                for jg in range(len(gh)-1-ig):
-                    if gh[jg]>gh[jg+1]:
-                        gh[jg],gh[jg+1]=gh[jg+1],gh[jg]
-                        to_add[jg],to_add[jg+1]=to_add[jg+1],to_add[jg]
-            self.__bfstmp+=to_add
-            i+=1
+                #忽略不能走以及已经在closed list中的
+                if not self.accessible(n) or self.bfs_contains(n):
+                    continue
+                #gh
+                n[INDEX_G]=f[INDEX_G]+1
+                n[INDEX_H]=self.manhattan(n[0],n[1],n[2],x2,y2,z2)
+                n[INDEX_F]=n[INDEX_G]+n[INDEX_H]
+                #point find只比较前三项（坐标），返回下标
+                finded=Map.__point_find(open_list,n)
+                if finded == -1:
+                    open_list.append(n)
+                elif open_list[finded][INDEX_G]>n[INDEX_G]:
+                    #重新计算G值，如果更小，就更新g值以及父节点
+                    open_list[finded]=n
+
+            #取gh最小,排序open list
+            open_list.sort(key=lambda item: item[INDEX_F])
         return None
     def __gh(self,pst,pcu,pen)->int:
         #g+h
@@ -153,7 +176,7 @@ class Map:
 if __name__=='__main__':
     #测试代码
     # 创建一个新的图形
-    SIZE=20
+    SIZE=10
     fig=plt.figure()
     ax=fig.add_subplot(projection='3d')
     map=Map(SIZE,SIZE,SIZE)
