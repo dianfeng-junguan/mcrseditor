@@ -94,7 +94,89 @@ def solve(cmd:str):
         for l in range(max(rect[2:])):
             comm.put(['setblock',vadd(p1,(l if direc=='h' else 0, l if direc=='v' else 0))])
     elif args[0]=='export':
-        #生成nbt
+        export(args[1])
+
+#加载门电路库
+with open('gates.json','r') as f:
+    global gates
+    gates=json.load(f)
+if len(sys.argv)>1:
+    with open(sys.argv[1],'r') as f:
+        cmds=f.readlines()
+    for l in cmds:
+        solve(l)
+    comm.put(['q'])
+    sys.exit()
+
+def draw_gate(gate,rect):
+    pygame.draw.rect(buffer,(100,100,100),(rect[0],rect[1],rect[2],rect[3]),\
+                    width=3)
+    font=pygame.font.SysFont('arial',15)
+    buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,(10,10)))
+def deal_sel(curpos:tuple[int,int]):
+    '''
+    处理鼠标模式（放置门etc)
+    '''
+    global selgate,selmode,blkmap
+    blkpos=[e-e%BLOCK_RENDERW for e in curpos]
+    if selmode=='gate':
+        gt=gates[selgate]
+        if not available(blkpos,gt['size']):
+            print('failed placing gate: place not enough')
+            return
+        blkmap.append({"type":selgate,"rect":[int(e/BLOCK_RENDERW) for e in blkpos]+(gt['size'])})
+        #清空状态
+        selmode=''
+    elif selmode=='line1':
+        global linep1
+        linep1=blkpos
+        selmode='line2'
+    elif selmode=='line2':
+        global linep2,linedir
+        #做出选择:h or v
+        if linedir=='h':
+            linep2=[blkpos[0],linep1[1]]
+        else:
+            linep2=[linep1[0],blkpos[1]]
+        
+        addline([int(e/BLOCK_RENDERW) for e in linep1],[int(e/BLOCK_RENDERW) for e in linep2])
+        selmode=''
+def addline(p1,p2):
+    '''
+    p1,p2应该是以方块为单位的坐标
+    '''
+    l=p1+[p2[0]-p1[0],p2[1]-p1[1]]
+    conn.append(l[-1:])
+#鼠标模式:=gate为放置门电路
+def put_gate(type:str):
+    global selgate,selmode
+    '''
+    在界面中放置门
+    '''
+    selgate=type
+    selmode='gate'
+def put_line():
+    global selmode
+    selmode='line1'
+def menuopen():
+    path=filedialog.askopenfilename()
+    openf(path)
+def menusave():
+    global curf
+    if len(curf)==0:
+        curf=filedialog.asksaveasfilename()
+    savef(curf)
+def menunew():
+    global curf,selmode
+    curf=''
+    blkmap.clear()
+    conn.clear()
+    selmode=''
+def menuexp():
+    expf=filedialog.asksaveasfilename()
+    export(expf)
+def export(path:str):
+    #生成nbt
         nbtgates={"and":nbt.read_from_nbt_file('lib/nbt/and_2_1.nbt'),\
                   "or":nbt.read_from_nbt_file('lib/nbt/or_2_1.nbt'),\
                     "not":nbt.read_from_nbt_file('lib/nbt/not_1_1.nbt')}
@@ -148,86 +230,9 @@ def solve(cmd:str):
                     rx+=1
                 else:
                     rz+=1
-        with open(args[1],'wb') as f:
+        with open(path,'wb') as f:
             nbt.write_to_nbt_file(f,struct.get_nbt())
         print('done')
-
-#加载门电路库
-with open('gates.json','r') as f:
-    global gates
-    gates=json.load(f)
-if len(sys.argv)>1:
-    with open(sys.argv[1],'r') as f:
-        cmds=f.readlines()
-    for l in cmds:
-        solve(l)
-    comm.put(['q'])
-    sys.exit()
-
-def draw_gate(gate,rect):
-    pygame.draw.rect(buffer,(100,100,100),(rect[0],rect[1],rect[2],rect[3]),\
-                    width=3)
-    font=pygame.font.SysFont('arial',15)
-    buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,(10,10)))
-def deal_sel(curpos:tuple[int,int]):
-    '''
-    处理鼠标模式（放置门etc)
-    '''
-    global selgate,selmode
-    blkpos=[e-e%BLOCK_RENDERW for e in curpos]
-    if selmode=='gate':
-        gt=gates[selgate]
-        if not available(blkpos,gt['size']):
-            print('failed placing gate: place not enough')
-            return
-        blkmap.append({"type":selgate,"rect":blkpos+(gt['size'])})
-        #清空状态
-        selmode=''
-    elif selmode=='line1':
-        global linep1
-        linep1=blkpos
-        selmode='line2'
-    elif selmode=='line2':
-        global linep2,linedir
-        #做出选择:h or v
-        if linedir=='h':
-            linep2=[blkpos[0],linep1[1]]
-        else:
-            linep2=[linep1[0],blkpos[1]]
-        
-        addline([int(e/BLOCK_RENDERW) for e in linep1],[int(e/BLOCK_RENDERW) for e in linep2])
-        selmode=''
-def addline(p1,p2):
-    '''
-    p1,p2应该是以方块为单位的坐标
-    '''
-    l=p1+[p2[0]-p1[0],p2[1]-p1[1]]
-    conn.append(l)
-#鼠标模式:=gate为放置门电路
-def put_gate(type:str):
-    global selgate,selmode
-    '''
-    在界面中放置门
-    '''
-    selgate=type
-    selmode='gate'
-def put_line():
-    global selmode
-    selmode='line1'
-def menuopen():
-    path=filedialog.askopenfilename()
-    openf(path)
-def menusave():
-    global curf
-    if len(curf)==0:
-        curf=filedialog.asksaveasfilename()
-    savef(curf)
-def menunew():
-    global curf,selmode
-    curf=''
-    blkmap.clear()
-    conn.clear()
-    selmode=''
 if __name__=='__main__':
     selmode=''
     selgate=''
@@ -250,19 +255,25 @@ if __name__=='__main__':
 
     filemenu=tk.Menu(menubar)
     filemenu.add_command(label='Open',command=menuopen)
+    filemenu.bind_all("<Control-o>",lambda arg:menuopen())
     filemenu.add_command(label='Save',command=menusave)
+    filemenu.bind_all("<Control-s>",lambda arg:menusave())
     filemenu.add_command(label='New',command=menunew)
+    filemenu.bind_all("<Control-n>",lambda arg:menunew())
+    filemenu.add_command(label='Export',accelerator="Ctrl+E",command=menuexp)
+    filemenu.bind_all("<Control-e>",lambda arg:menuexp())
     editmenu=tk.Menu(menubar)
     gatemenu=tk.Menu(editmenu)
-    gatemenu.add_command(label='And',accelerator='Ctrl+A',command=lambda :put_gate('and'))
-    gatemenu.bind_all("<Control-a>",lambda arg:put_gate('and'))
-    gatemenu.add_command(label='Or',accelerator= 'Ctrl+O' ,command=lambda :put_gate('or'))
-    gatemenu.bind_all("<Control-o>",lambda arg:put_gate('or'))
-    gatemenu.add_command(label='Not',accelerator='Ctrl+N',command=lambda :put_gate('not'))
-    gatemenu.bind_all("<Control-n>",lambda arg:put_gate('not'))
+    gatemenu.add_command(label='And',accelerator='q',command=lambda :put_gate('and'))
+    gatemenu.bind_all("<q>",lambda arg:put_gate('and'))
+    gatemenu.add_command(label='Or',accelerator= 'w' ,command=lambda :put_gate('or'))
+    gatemenu.bind_all("<w>",lambda arg:put_gate('or'))
+    gatemenu.add_command(label='Not',accelerator='e',command=lambda :put_gate('not'))
+    gatemenu.bind_all("<e>",lambda arg:put_gate('not'))
 
     editmenu.add_cascade(label='Add Gate',menu=gatemenu)
-    editmenu.add_command(label='Add Line',command=put_line)
+    editmenu.add_command(label='Add Line',command=put_line,accelerator="Ctrl+l")
+    gatemenu.bind_all("<Control-l>",lambda arg:put_line())
     # 将下拉菜单添加到顶层菜单项
     menubar.add_cascade(label='Files', menu=filemenu)
     menubar.add_cascade(label='Edit', menu=editmenu)
