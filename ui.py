@@ -28,6 +28,8 @@ def vadd(a,b)->list:
     for i in range(min(len(a),len(b))):
         c.append(a[i]+b[i])
     return c
+def vsub(a,b)->list:
+    return vadd(a,[-e for e in b])
 def overlap(rect1,rect2)->bool:
     pos=rect1[:2]
     size=rect1[2:]
@@ -107,22 +109,33 @@ if len(sys.argv)>1:
         solve(l)
     comm.put(['q'])
     sys.exit()
+def drawline(rect):
+    pygame.draw.rect(buffer,(255,255,255),vadd(rect,render_origin+[0,0]))
+def draw_gate(gate,rect,inmap=True):
+    if inmap:
+        pygame.draw.rect(buffer,(100,100,100),vadd(rect,render_origin+[0,0]),\
+                        width=3)
+    else:
+        pygame.draw.rect(buffer,(100,100,100),rect,\
+                        width=3)
 
-def draw_gate(gate,rect):
-    pygame.draw.rect(buffer,(100,100,100),(rect[0],rect[1],rect[2],rect[3]),\
-                    width=3)
     font=pygame.font.SysFont('arial',15)
     for p in gates[gate]['ports']:
         dp=[p[0]*BLOCK_RENDERW+rect[0],p[2]*BLOCK_RENDERW+rect[1],BLOCK_RENDERW,BLOCK_RENDERW]
-        pygame.draw.rect(buffer,(200,200,100),dp)
-        
-    buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,(10,10)))
+        if inmap:
+            pygame.draw.rect(buffer,(200,200,100),vadd(dp,render_origin+[0,0]))
+        else:
+            pygame.draw.rect(buffer,(200,200,100),dp)
+    if inmap:
+        buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,vadd((10,10,0,0),render_origin+[0,0])))
+    else:
+        buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,(10,10,0,0)))
 def deal_sel(curpos:tuple[int,int]):
     '''
     处理鼠标模式（放置门etc)
     '''
-    global selgate,selmode,blkmap
-    blkpos=[e-e%BLOCK_RENDERW for e in curpos]
+    global selgate,selmode,blkmap,render_origin
+    blkpos=[e-e%BLOCK_RENDERW for e in vsub(curpos,render_origin)]
     if selmode=='gate':
         gt=gates[selgate]
         if not available(blkpos,gt['size']):
@@ -152,10 +165,10 @@ def addline(p1,p2):
     dh=p2[0]-p1[0]
     dv=p2[1]-p1[1]
     if dh<0:
-        dh=-dh+1
+        dh=-dh
         p1[0]-=dh
     if dv<0:
-        dv=-dv+1
+        dv=-dv
         p1[1]-=dv
     l=p1+[dh,dv]
     
@@ -246,11 +259,17 @@ def export(path:str):
         with open(path,'wb') as f:
             nbt.write_to_nbt_file(f,struct.get_nbt())
         print('done')
+
+def draw_gridline(stpos,enpos):
+    #考虑相对坐标
+    pygame.draw.line(buffer,(100,100,100),vadd(stpos,render_origin),vadd(enpos,render_origin))
 if __name__=='__main__':
     selmode=''
     selgate=''
     linep1,linep2=[0,0],[0,0]
     linedir='h'
+    render_origin=[0,0]
+    dragging=False
     # pygame.init()  #内部各功能模块进行初始化创建及变量设置，默认调用
     # pygame.display.set_caption("MCrs")  #设置显示窗口的标题内容，是一个字符串类型
     size = width,height = 800,600  #设置游戏窗口大小，分别是宽度和高度
@@ -318,12 +337,23 @@ if __name__=='__main__':
                 # screen.blit(font.render(data[1],True,(255,255,255)),vadd(rect,(10,10)))
                 draw_gate(data[1],rect)
                 #TODO 绘制端口位置
+
+        #绘制网格
+        #得出视野范围
+        camerapos=[int(-e/BLOCK_RENDERW) for e in render_origin]
+        grid=[size[0]/BLOCK_RENDERW,size[1]/BLOCK_RENDERW]
+        #铅锤线
+        for gx in range(int(grid[0])):
+            draw_gridline(((camerapos[0]+gx)*BLOCK_RENDERW,camerapos[1]*BLOCK_RENDERW),((camerapos[0]+gx)*BLOCK_RENDERW,camerapos[1]*BLOCK_RENDERW+size[1]))
+        #水平线
+        for gy in range(int(grid[1])):
+            draw_gridline((camerapos[0]*BLOCK_RENDERW,(camerapos[1]+gy)*BLOCK_RENDERW),(camerapos[0]*BLOCK_RENDERW+size[0],(camerapos[1]+gy)*BLOCK_RENDERW))
         #绘制已经放置的
         for e in blkmap:
             draw_gate(e['type'],[ee*BLOCK_RENDERW for ee in e['rect']])
         for e in conn:
             conrect=[max(ee*BLOCK_RENDERW,BLOCK_RENDERW) for ee in e]
-            pygame.draw.rect(buffer,(255,255,255),conrect)
+            pygame.draw.rect(buffer,(255,255,255),vadd(conrect,render_origin+[0,0]))
         curpos=pygame.mouse.get_pos()
         
         for event in pygame.event.get():  #从Pygame的事件队列中取出事件，并从队列中删除该事件
@@ -332,29 +362,46 @@ if __name__=='__main__':
             elif event.type==pygame.MOUSEMOTION:
                 if selmode=='line2':
                     #确定方向
-                    delta=[curpos[0]-linep1[0],curpos[1]-linep1[1]]
+                    cp_curpos=vsub(copy.deepcopy(curpos),render_origin)
+                    delta=[cp_curpos[0]-linep1[0],cp_curpos[1]-linep1[1]]
                     if abs(delta[0])>abs(delta[1]):
                         linedir='h'
                     else:
                         linedir='v'
-                    linep2=[e-e%BLOCK_RENDERW for e in curpos]
+                    linep2=[e-e%BLOCK_RENDERW for e in cp_curpos]
+                #拖动
+                if dragging:
+                    movdelta=pygame.mouse.get_rel()
+                    render_origin=vadd(render_origin,movdelta)
             elif event.type==pygame.MOUSEBUTTONDOWN:
                 deal_sel(pygame.mouse.get_pos())
+                msebtn=pygame.mouse.get_pressed()
+                #中键按下，开始拖动
+                if msebtn[1]:
+                    dragging=True
+                    pygame.mouse.get_rel()
+            elif event.type==pygame.MOUSEBUTTONUP:
+                msebtn=pygame.mouse.get_pressed()
+                if not msebtn[1]:
+                    dragging=False
         #绘制鼠标上面的内容
         if selmode=='gate':
-            drawpos=[e-e%BLOCK_RENDERW for e in curpos]
+            cp_curpos=vsub(copy.deepcopy(curpos),render_origin)
+            drawpos=[e-e%BLOCK_RENDERW for e in cp_curpos]
             drawpos+=[e*BLOCK_RENDERW for e in gates[selgate]['size']]
             draw_gate(selgate,drawpos)
         elif selmode == 'line1':
-            pygame.draw.rect(buffer,(255,255,255),[e-e%BLOCK_RENDERW for e in curpos]+[BLOCK_RENDERW,BLOCK_RENDERW])
+            cp_curpos=vsub(copy.deepcopy(curpos),render_origin)
+            drre=[e-e%BLOCK_RENDERW for e in cp_curpos]+[BLOCK_RENDERW,BLOCK_RENDERW]
+            drawline(drre)
         elif selmode=='line2':
             i=0 if linedir=='h' else 1
             length=linep2[i]-linep1[i]
             st=copy.deepcopy(linep1)
             if length<0:
                 length=-length
-                st[i]-=length-BLOCK_RENDERW
-            pygame.draw.rect(buffer,(255,255,255),st+[length if not i else BLOCK_RENDERW,length if i else BLOCK_RENDERW])
+                st[i]-=length
+            drawline(st+[length if not i else BLOCK_RENDERW,length if i else BLOCK_RENDERW])
                 
         screen.blit(buffer,(0,0))
         pygame.display.flip()  #对显示窗口进行更新，默认窗口全部重绘
