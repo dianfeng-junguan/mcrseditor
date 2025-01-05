@@ -30,6 +30,20 @@ def vadd(a,b)->list:
     return c
 def vsub(a,b)->list:
     return vadd(a,[-e for e in b])
+def vmul(vec,num)->list:
+    '''
+    multiply every item of the vector with num. \\
+    does not guarantee intactness of vec.
+    '''
+    return [e*num for e in vec]
+def vdiv(vec,num)->list:
+    '''
+    divide every item of the vector with num. \\
+    does not guarantee intactness of vec.
+    the items of the returned list are ints.
+    '''
+    return [int(e/num) for e in vec]
+    
 def overlap(rect1,rect2)->bool:
     pos=rect1[:2]
     size=rect1[2:]
@@ -54,7 +68,7 @@ def openf(given:str):
     curf=given
 def savef(path:str):
     with open(path,'w') as f:
-        json.dump({'components':blkmap,'connections':conn},f)
+        json.dump({'components':blkmap,'connections':conn},f,indent=4)
 def solve(cmd:str):
     global blkmap,conn,curf
     args=cmd.strip().lower().split(' ')
@@ -130,50 +144,105 @@ def draw_gate(gate,rect,inmap=True):
         buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,vadd((10,10,0,0),render_origin+[0,0])))
     else:
         buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,(10,10,0,0)))
+def get_port_or_line(pos:list)->list:
+    '''
+    returns the 3d position of the port or line at **pos**.
+    returns None if there's nothing.
+    pos needs to be 2d.
+    '''
+    #detect whether a port or a line is clicked
+    #gates
+    for sub in blkmap:
+        #gates
+        according_gate:dict=gates[sub['type']]
+        ports=according_gate['ports']
+        clicked_port=None
+        for p in ports:
+            if pos==vadd([p[0],p[2]],sub['rect'][:2]):
+                #this port is clicked
+                clicked_port=p
+                break
+        if not clicked_port is None:
+            print('clicked port:',clicked_port)
+            return clicked_port
+    #line
+    for c in conn:
+        #format of line data:[x1,y1,z1,x2,y2,z2]
+        direction='h'
+        if c[2]!=c[5]:
+            direction='v'
+        x1,y1,z1,x2,y2,z2=c[0],c[1],c[2],c[3],c[4],c[5]
+        if direction=='h' and pos[1]==c[2] and min(x1,x2)<=pos[0]<max(x1,x2) or \
+            direction=='v' and pos[0]==c[0] and min(z1,z2)<=pos[0]<max(z1,z2):
+            #match
+            #need to calculate the y at pos if the line is not in xOz
+            yv=y1
+            if not y1==y2:
+                #can only decrease up to one block per block
+                line_len=abs(x1-x2) if direction=='h' else abs(z1-z2)
+                k=(y1-y2)/line_len
+                yv=y1-int(k*((pos[0]-z1) if direction=='h' else (pos[1]-z1)))
+            print('clicked line:',[pos[0],yv,pos[1]])
+            return [pos[0],yv,pos[1]]
+    return None
 def deal_sel(curpos:tuple[int,int]):
     '''
     处理鼠标模式（放置门etc)
     '''
     global selgate,selmode,blkmap,render_origin
-    blkpos=[e-e%BLOCK_RENDERW for e in vsub(curpos,render_origin)]
+    floored_pos=[e-e%BLOCK_RENDERW for e in vsub(curpos,render_origin)]
+    block_pos=vdiv(floored_pos,BLOCK_RENDERW)
     if selmode=='gate':
         gt=gates[selgate]
-        if not available(blkpos,gt['size']):
+        if not available(floored_pos,gt['size']):
             print('failed placing gate: place not enough')
+            selmode=''
             return
-        blkmap.append({"type":selgate,"rect":[int(e/BLOCK_RENDERW) for e in blkpos]+(gt['size'])})
+        blkmap.append({"type":selgate,"rect":[int(e/BLOCK_RENDERW) for e in floored_pos]+(gt['size'])})
         #清空状态
         selmode=''
     elif selmode=='line1':
         global linep1
-        
-        linep1=blkpos
+        clicked_subject=get_port_or_line(block_pos)
+        linep1=[floored_pos[0]/BLOCK_RENDERW,1,floored_pos[1]/BLOCK_RENDERW]
+        if not clicked_subject is None:
+            linep1[1]=clicked_subject[1]#set y
+        #eliminate the sudden change of line len
+        linep2=copy.deepcopy(linep1)
         selmode='line2'
     elif selmode=='line2':
-        global linep2,linedir
+        global linedir
         #做出选择:h or v
         if linedir=='h':
-            linep2=[blkpos[0],linep1[1]]
+            linep2=[floored_pos[0]/BLOCK_RENDERW,1,linep1[2]]
         else:
-            linep2=[linep1[0],blkpos[1]]
+            linep2=[linep1[0],1,floored_pos[1]/BLOCK_RENDERW]
+        clicked_subject=get_port_or_line(block_pos)
+        if not clicked_subject is None:
+            linep2[1]=clicked_subject[1]#set y
         
-        addline([int(e/BLOCK_RENDERW) for e in linep1],[int(e/BLOCK_RENDERW) for e in linep2])
+        addline(linep1,linep2)
         selmode=''
+        linedir=''
 def addline(p1,p2):
     '''
-    p1,p2应该是以方块为单位的坐标
+    add a line.
+    p1,p2 needs to be 3d blockpos.
     '''
-    dh=p2[0]-p1[0]
-    dv=p2[1]-p1[1]
-    if dh<0:
-        dh=-dh
-        p1[0]-=dh
-    if dv<0:
-        dv=-dv
-        p1[1]-=dv
-    l=p1+[dh,dv]
-    
-    conn.append(l)
+    conn.append(list(map(int,(p1+p2))))
+def interpolation(vst,ven,pst,pen,pcur)->int:
+    '''
+    calcs the linear interpolation of v.\\
+    the return value is an interpolation between vst and ven,\\
+    the ratio is calced from pst, pen and pcur. pst and pen are the boundaries,\\
+    and pcur is the point you want to calc.\\
+    the result is floored.
+    '''
+    vdelta=ven-vst
+    pdelta=pen-pst
+    k=vdelta/pdelta
+    pcurdelta=pcur-pst
+    return int(vst+k*pcurdelta)
 #鼠标模式:=gate为放置门电路
 def put_gate(type:str):
     global selgate,selmode
@@ -245,21 +314,23 @@ def export(path:str):
                 state=b['state'].value
                 newi=state+base
                 rx=sub['rect'][0]+bx
-                ry=1+by
+                ry=0+by
                 #sub['rect'][1]
                 rz=sub['rect'][1]+bz
                 struct.setblock(rx,ry,rz,newi)
         for lc in conn:
             #连接线
             #TODO 添加中继器
-            rx,rz=lc[0],lc[1]
-            for l in range(max(lc[2:])):
-                struct.setblock(rx,1,rz,1)
-                struct.setblock(rx,0,rz,0)
-                if lc[3]:
-                    rz+=1
-                else:
-                    rx+=1
+            startpos,endpos=lc[0:3],lc[3:]
+            #determine which index(direction) to extend
+            direction_index=0 if startpos[0]!=endpos[0] else 2
+            for l in range(startpos[direction_index],endpos[direction_index]):
+                #calc interpolation
+                ry=interpolation(startpos[1],endpos[1],startpos[direction_index],endpos[direction_index],l)
+                rx=l if direction_index ==0 else startpos[0]
+                rz=l if direction_index ==2 else startpos[2]
+                struct.setblock(rx,ry,  rz,1)
+                struct.setblock(rx,ry-1,rz,0)
         with open(path,'wb') as f:
             nbt.write_to_nbt_file(f,struct.get_nbt())
         print('done')
@@ -281,7 +352,8 @@ if __name__=='__main__':
     DEFAULT_TITLE="Minecraft Redstone Designer"
     selmode=''
     selgate=''
-    linep1,linep2=[0,0],[0,0]
+    #the starting and ending points of a line to be added in block pos.
+    linep1,linep2=[0,0,0],[0,0,0]
     linedir='h'
     render_origin=[0,0]
     dragging=False
@@ -377,12 +449,32 @@ if __name__=='__main__':
         for e in blkmap:
             draw_gate(e['type'],[ee*BLOCK_RENDERW for ee in e['rect']])
         for e in conn:
-            conrect=[max(ee*BLOCK_RENDERW,BLOCK_RENDERW) for ee in e]
-            pygame.draw.rect(buffer,(255,255,255),vadd(conrect,render_origin+[0,0]))
+            e:list
+            conrect=e.copy()
+            conrect.pop(1)
+            conrect.pop(3)#drop two ys
+            conrect=vmul(conrect,BLOCK_RENDERW)
+            #convert to [x1,z1,w,h]
+            conrect[2]=conrect[2]-conrect[0]
+            if conrect[2]==0:
+                conrect[2]=BLOCK_RENDERW
+            elif conrect[2]<0:
+                conrect[2]*=-1
+                conrect[0]-=conrect[2]
+            conrect[3]=conrect[3]-conrect[1]
+            if conrect[3]==0:
+                conrect[3]=BLOCK_RENDERW
+            elif conrect[3]<0:
+                conrect[3]*=-1
+                conrect[1]-=conrect[3]
+            drawline(conrect)
+            del conrect
         curpos=pygame.mouse.get_pos()
         #在状态栏显示鼠标所处的方块坐标
         curpos_toblkpos=[e/BLOCK_RENDERW for e in vsub(copy.deepcopy(curpos),render_origin)]
         txt_coordinate="(%d,%d)"%(curpos_toblkpos[0],curpos_toblkpos[1])
+        if linedir in ['h','v']:
+            txt_coordinate+=',%s'%(linedir)
         status_label.config(text=txt_coordinate)
         #在左上角显示
         buffer.blit(font.render(txt_coordinate,False,(255,255,255)),(0,0))
@@ -394,12 +486,13 @@ if __name__=='__main__':
                 if selmode=='line2':
                     #确定方向
                     cp_curpos=vsub(copy.deepcopy(curpos),render_origin)
-                    delta=[cp_curpos[0]-linep1[0],cp_curpos[1]-linep1[1]]
+                    delta=[cp_curpos[0]-linep1[0]*BLOCK_RENDERW,cp_curpos[1]-linep1[1]*BLOCK_RENDERW]
                     if abs(delta[0])>abs(delta[1]):
                         linedir='h'
                     else:
                         linedir='v'
-                    linep2=[e-e%BLOCK_RENDERW for e in cp_curpos]
+                    linep2=[(e-e%BLOCK_RENDERW)/BLOCK_RENDERW for e in cp_curpos]
+                    linep2.insert(1,0)
                 #拖动
                 if dragging:
                     movdelta=pygame.mouse.get_rel()
@@ -434,12 +527,13 @@ if __name__=='__main__':
             drre=[e-e%BLOCK_RENDERW for e in cp_curpos]+[BLOCK_RENDERW,BLOCK_RENDERW]
             drawline(drre)
         elif selmode=='line2':
-            i=0 if linedir=='h' else 1
-            length=linep2[i]-linep1[i]
-            st=copy.deepcopy(linep1)
+            i=0 if linedir=='h' else 2
+            length=(linep2[i]-linep1[i])*BLOCK_RENDERW
+            st=vmul(copy.deepcopy(linep1),BLOCK_RENDERW)
             if length<0:
                 length=-length
                 st[i]-=length
+            st.pop(1)
             drawline(st+[length if not i else BLOCK_RENDERW,length if i else BLOCK_RENDERW])
                 
         screen.blit(buffer,(0,0))
