@@ -146,6 +146,7 @@ def deal_sel(curpos:tuple[int,int]):
         selmode=''
     elif selmode=='line1':
         global linep1
+        
         linep1=blkpos
         selmode='line2'
     elif selmode=='line2':
@@ -404,12 +405,14 @@ if __name__=='__main__':
                     movdelta=pygame.mouse.get_rel()
                     render_origin=vadd(render_origin,movdelta)
             elif event.type==pygame.MOUSEBUTTONDOWN:
-                deal_sel(pygame.mouse.get_pos())
                 msebtn=pygame.mouse.get_pressed()
                 #中键按下，开始拖动
                 if msebtn[1]:
                     dragging=True
                     pygame.mouse.get_rel()
+                elif msebtn[0]:
+                    #lbutton
+                    deal_sel(pygame.mouse.get_pos())
             elif event.type==pygame.MOUSEBUTTONUP:
                 msebtn=pygame.mouse.get_pressed()
                 if not msebtn[1]:
