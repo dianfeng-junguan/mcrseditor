@@ -250,6 +250,7 @@ def export(path:str):
                 struct.setblock(rx,ry,rz,newi)
         for lc in conn:
             #连接线
+            #TODO 添加中继器
             rx,rz=lc[0],lc[1]
             for l in range(max(lc[2:])):
                 struct.setblock(rx,1,rz,1)
@@ -268,6 +269,13 @@ def draw_gridline(stpos,enpos):
 def clear_selmode():
     global selmode
     selmode=''
+
+def window_end():
+    global _lock
+    _lock=False
+    tkroot.destroy()
+    pygame.quit()
+    sys.exit(0)
 if __name__=='__main__':
     DEFAULT_TITLE="Minecraft Redstone Designer"
     selmode=''
@@ -293,6 +301,7 @@ if __name__=='__main__':
     os.environ['SDL_WINDOWID'] = str(frame.winfo_id())
     os.environ['SDL_VIDEODRIVER'] = 'windib'
     tkroot.update()
+    tkroot.protocol('WM_DELETE_WINDOW',window_end)
     #菜单栏# 创建顶层菜单
     menubar = tk.Menu(tkroot)
     # 添加菜单项
@@ -330,7 +339,8 @@ if __name__=='__main__':
     screen = pygame.display.set_mode(size)  #初始化显示窗口
     buffer=pygame.Surface(size)
     font=pygame.font.SysFont("Arial",25)
-    while True:  #无限循环，直到Python运行时退出结束
+    _lock=True
+    while _lock:  #无限循环，直到Python运行时退出结束
         buffer.fill((0,0,0))
         if not comm.empty():
             #有来自cmd的消息
@@ -377,7 +387,8 @@ if __name__=='__main__':
         buffer.blit(font.render(txt_coordinate,False,(255,255,255)),(0,0))
         for event in pygame.event.get():  #从Pygame的事件队列中取出事件，并从队列中删除该事件
             if event.type == pygame.QUIT:  #获得事件类型，并逐类响应
-                break
+                _lock=False
+                sys.exit(0)
             elif event.type==pygame.MOUSEMOTION:
                 if selmode=='line2':
                     #确定方向

@@ -1,3 +1,13 @@
 .vscode/
 *.nbt
 *.json
+__pycache__
+日志.md
+noise.py
+libgen.py
+editor.py
+schema.py
+termin.py
+*.e
+pathseek.py
+unused
