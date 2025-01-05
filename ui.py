@@ -186,11 +186,13 @@ def put_line():
     selmode='line1'
 def menuopen():
     path=filedialog.askopenfilename()
+    tkroot.title(DEFAULT_TITLE+" %s"%(path))
     openf(path)
 def menusave():
     global curf
     if len(curf)==0:
         curf=filedialog.asksaveasfilename()
+    tkroot.title(DEFAULT_TITLE+" %s"%(curf))
     savef(curf)
 def menunew():
     global curf,selmode
@@ -263,7 +265,11 @@ def export(path:str):
 def draw_gridline(stpos,enpos):
     #考虑相对坐标
     pygame.draw.line(buffer,(100,100,100),vadd(stpos,render_origin),vadd(enpos,render_origin))
+def clear_selmode():
+    global selmode
+    selmode=''
 if __name__=='__main__':
+    DEFAULT_TITLE="Minecraft Redstone Designer"
     selmode=''
     selgate=''
     linep1,linep2=[0,0],[0,0]
@@ -272,12 +278,18 @@ if __name__=='__main__':
     dragging=False
     # pygame.init()  #内部各功能模块进行初始化创建及变量设置，默认调用
     # pygame.display.set_caption("MCrs")  #设置显示窗口的标题内容，是一个字符串类型
-    size = width,height = 800,600  #设置游戏窗口大小，分别是宽度和高度
+    size = width,height = 1200,600  #设置游戏窗口大小，分别是宽度和高度
     BLOCK_RENDERW=20
     #tkinter内嵌pygame 以便于加gui
     tkroot=tk.Tk()
+    tkroot.title(DEFAULT_TITLE)
     frame=tk.Frame(tkroot,width=width,height=height)
-    frame.pack()
+    #状态栏
+    status_bar=tk.Frame(tkroot,height=25,bd=1,relief=tk.RAISED)
+    status_label=tk.Label(status_bar,text="(,)")
+    frame.pack(fill=tk.BOTH,side=tk.TOP)
+    status_label.pack(side=tk.LEFT)
+    status_bar.pack(fill=tk.X,side=tk.BOTTOM)
     os.environ['SDL_WINDOWID'] = str(frame.winfo_id())
     os.environ['SDL_VIDEODRIVER'] = 'windib'
     tkroot.update()
@@ -309,13 +321,15 @@ if __name__=='__main__':
     # 将下拉菜单添加到顶层菜单项
     menubar.add_cascade(label='Files', menu=filemenu)
     menubar.add_cascade(label='Edit', menu=editmenu)
+
+    tkroot.bind_all('<Escape>',lambda arg:clear_selmode())
     # 显示菜单
     tkroot.config(menu=menubar)
     pygame.display.init()
     pygame.font.init()
     screen = pygame.display.set_mode(size)  #初始化显示窗口
     buffer=pygame.Surface(size)
-
+    font=pygame.font.SysFont("Arial",25)
     while True:  #无限循环，直到Python运行时退出结束
         buffer.fill((0,0,0))
         if not comm.empty():
@@ -355,7 +369,12 @@ if __name__=='__main__':
             conrect=[max(ee*BLOCK_RENDERW,BLOCK_RENDERW) for ee in e]
             pygame.draw.rect(buffer,(255,255,255),vadd(conrect,render_origin+[0,0]))
         curpos=pygame.mouse.get_pos()
-        
+        #在状态栏显示鼠标所处的方块坐标
+        curpos_toblkpos=[e/BLOCK_RENDERW for e in vsub(copy.deepcopy(curpos),render_origin)]
+        txt_coordinate="(%d,%d)"%(curpos_toblkpos[0],curpos_toblkpos[1])
+        status_label.config(text=txt_coordinate)
+        #在左上角显示
+        buffer.blit(font.render(txt_coordinate,False,(255,255,255)),(0,0))
         for event in pygame.event.get():  #从Pygame的事件队列中取出事件，并从队列中删除该事件
             if event.type == pygame.QUIT:  #获得事件类型，并逐类响应
                 break
@@ -384,6 +403,12 @@ if __name__=='__main__':
                 msebtn=pygame.mouse.get_pressed()
                 if not msebtn[1]:
                     dragging=False
+            elif event.type==pygame.WINDOWRESIZED:
+                #重新设置画布大小
+                size=width,height=(tkroot.winfo_width(),tkroot.winfo_height())
+                buffer=pygame.display.set_mode(size)
+                screen=pygame.display.set_mode(size)
+                status_bar.lift()
         #绘制鼠标上面的内容
         if selmode=='gate':
             cp_curpos=vsub(copy.deepcopy(curpos),render_origin)
