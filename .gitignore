@@ -1,6 +1,6 @@
 .vscode/
-*.nbt
-*.json
+/*.nbt
+/*.json
 __pycache__
 日志.md
 noise.py
