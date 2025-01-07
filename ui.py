@@ -446,7 +446,7 @@ if __name__=='__main__':
                 if selmode=='line2':
                     #确定方向
                     cp_curpos=vsub(copy.deepcopy(curpos),render_origin)
-                    delta=[cp_curpos[0]-linep1[0]*BLOCK_RENDERW,cp_curpos[1]-linep1[1]*BLOCK_RENDERW]
+                    delta=[cp_curpos[0]-linep1[0]*BLOCK_RENDERW,cp_curpos[1]-linep1[2]*BLOCK_RENDERW]
                     if abs(delta[0])>abs(delta[1]):
                         linedir='h'
                     else:
