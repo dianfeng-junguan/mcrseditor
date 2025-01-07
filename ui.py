@@ -13,9 +13,6 @@ import pygame_gui
 from tkinter import filedialog
 from queue import Queue
 
-comm=Queue(32)#两个线程通信用 cmd2display
-com_dis2cmd=Queue(32)#display2cmd
-
 
 helper="help\t\
     setblock <x,z> <block>\
@@ -260,13 +257,13 @@ def put_line():
     selmode='line1'
 def menuopen():
     path=filedialog.askopenfilename()
-    tkroot.title(DEFAULT_TITLE+" %s"%(path))
+    pygame.display.set_caption(DEFAULT_TITLE+" %s"%(path))
     openf(path)
 def menusave():
     global curf
     if len(curf)==0:
         curf=filedialog.asksaveasfilename()
-    tkroot.title(DEFAULT_TITLE+" %s"%(curf))
+    pygame.display.set_caption(DEFAULT_TITLE+" %s"%(curf))
     savef(curf)
 def menunew():
     global curf,selmode
@@ -349,7 +346,6 @@ def clear_selmode():
 def window_end():
     global _lock
     _lock=False
-    tkroot.destroy()
     pygame.quit()
     sys.exit(0)
 if __name__=='__main__':
@@ -361,93 +357,43 @@ if __name__=='__main__':
     linedir='h'
     render_origin=[0,0]
     dragging=False
-    # pygame.init()  #内部各功能模块进行初始化创建及变量设置，默认调用
-    # pygame.display.set_caption("MCrs")  #设置显示窗口的标题内容，是一个字符串类型
+    pygame.init()  #内部各功能模块进行初始化创建及变量设置，默认调用
+    pygame.display.set_caption(DEFAULT_TITLE)  #设置显示窗口的标题内容，是一个字符串类型
     size = width,height = 1200,600  #设置游戏窗口大小，分别是宽度和高度
     BLOCK_RENDERW=20
-    #tkinter内嵌pygame 以便于加gui
-    tkroot=tk.Tk()
-    tkroot.title(DEFAULT_TITLE)
-    frame=tk.Frame(tkroot,width=width,height=height)
-    #状态栏
-    status_bar=tk.Frame(tkroot,height=25,bd=1,relief=tk.RAISED)
-    status_label=tk.Label(status_bar,text="(,)")
-    frame.pack(fill=tk.BOTH,side=tk.TOP)
-    status_label.pack(side=tk.LEFT)
-    status_bar.pack(fill=tk.X,side=tk.BOTTOM)
-    os.environ['SDL_WINDOWID'] = str(frame.winfo_id())
-    os.environ['SDL_VIDEODRIVER'] = 'windib'
-    tkroot.update()
-    tkroot.protocol('WM_DELETE_WINDOW',window_end)
-    #菜单栏# 创建顶层菜单
-    menubar = tk.Menu(tkroot)
-    # 添加菜单项
-
-    filemenu=tk.Menu(menubar)
-    filemenu.add_command(label='Open',command=menuopen)
-    filemenu.bind_all("<Control-o>",lambda arg:menuopen())
-    filemenu.add_command(label='Save',command=menusave)
-    filemenu.bind_all("<Control-s>",lambda arg:menusave())
-    filemenu.add_command(label='New',command=menunew)
-    filemenu.bind_all("<Control-n>",lambda arg:menunew())
-    filemenu.add_command(label='Export',accelerator="Ctrl+E",command=menuexp)
-    filemenu.bind_all("<Control-e>",lambda arg:menuexp())
-    editmenu=tk.Menu(menubar)
-    gatemenu=tk.Menu(editmenu)
-    gatemenu.add_command(label='And',accelerator='q',command=lambda :put_gate('and'))
-    gatemenu.bind_all("<q>",lambda arg:put_gate('and'))
-    gatemenu.add_command(label='Or',accelerator= 'w' ,command=lambda :put_gate('or'))
-    gatemenu.bind_all("<w>",lambda arg:put_gate('or'))
-    gatemenu.add_command(label='Not',accelerator='e',command=lambda :put_gate('not'))
-    gatemenu.bind_all("<e>",lambda arg:put_gate('not'))
-
-    editmenu.add_cascade(label='Add Gate',menu=gatemenu)
-    editmenu.add_command(label='Add Line',command=put_line,accelerator="Ctrl+f")
-    gatemenu.bind_all("<Control-f>",lambda arg:put_line())
-    # 将下拉菜单添加到顶层菜单项
-    menubar.add_cascade(label='Files', menu=filemenu)
-    menubar.add_cascade(label='Edit', menu=editmenu)
-
-    tkroot.bind_all('<Escape>',lambda arg:clear_selmode())
-    # 显示菜单
-    tkroot.config(menu=menubar)
-    pygame.display.init()
-    pygame.font.init()
-    screen = pygame.display.set_mode(size)  #初始化显示窗口
+    
+    ctrl=False
+    #hot keys
+    hot_key_map={
+        'ctrl':{
+            pygame.K_o:menuopen,
+            pygame.K_s:menusave,
+            pygame.K_e:menuexp,
+        },
+        'single':{
+            pygame.K_q:lambda :put_gate('and'),
+            pygame.K_w:lambda :put_gate('or'),
+            pygame.K_e:lambda :put_gate('not'),
+            pygame.K_r:put_line,
+            pygame.K_ESCAPE:clear_selmode
+        }   
+    }
+    screen = pygame.display.set_mode(size,pygame.RESIZABLE)  #初始化显示窗口
     buffer=pygame.Surface(size)
     font=pygame.font.SysFont("Arial",25)
     ui_manager=pygame_gui.ui_manager.UIManager(size)
 
     mainmenu=menu.MenuBar(width,ui_manager)
-    mainmenu.add_item('Files',{'Open':menuopen,'Save':menusave,'Export':menuexp})
-    mainmenu.add_item('Edit',{'Add':lambda :put_gate('and'),\
-                              'Or':lambda :put_gate('or'),\
-                                'Not': lambda :put_gate('not'),\
-                                    'Line':put_line})
+    mainmenu.add_item('Files',{'Open ctrl+o':menuopen,'Save ctrl+s':menusave,'Export ctrl+e':menuexp})
+    mainmenu.add_item('Edit',{'Add q':lambda :put_gate('and'),\
+                              'Or w':lambda :put_gate('or'),\
+                                'Not e': lambda :put_gate('not'),\
+                                    'Line r':put_line})
     clock=pygame.Clock()
     _lock=True
     while _lock:  #无限循环，直到Python运行时退出结束
         delta_time=clock.tick(60)/1000
         buffer.fill((0,0,0))
-        if not comm.empty():
-            #有来自cmd的消息
-            data:list=comm.get()
-            #解析
-            if data[0]=='setblock':
-                rect=[e*BLOCK_RENDERW for e in data[1]]
-                pygame.draw.rect(screen,(255,255,255),(rect[0],rect[1],rect[0]+BLOCK_RENDERW,rect[1]+BLOCK_RENDERW))
-            elif data[0]=='q':
-                break
-            elif data[0]=='update':
-                pygame.display.update()
-            elif data[0]=='gate':
-                # rect=[e*BLOCK_RENDERW for e in data[2]]
-                # pygame.draw.rect(screen,(100,100,100),(rect[0],rect[1],rect[0]+rect[2],rect[1]+rect[3]),\
-                #                  width=3)
-                # font=pygame.font.SysFont('arial',15)
-                # screen.blit(font.render(data[1],True,(255,255,255)),vadd(rect,(10,10)))
-                draw_gate(data[1],rect)
-                #TODO 绘制端口位置
 
         #绘制网格
         #得出视野范围
@@ -489,14 +435,13 @@ if __name__=='__main__':
         txt_coordinate="(%d,%d)"%(curpos_toblkpos[0],curpos_toblkpos[1])
         if linedir in ['h','v']:
             txt_coordinate+=',%s'%(linedir)
-        status_label.config(text=txt_coordinate)
+        # status_label.config(text=txt_coordinate)
         #在左上角显示
-        buffer.blit(font.render(txt_coordinate,False,(255,255,255)),(0,0))
+        buffer.blit(font.render(txt_coordinate,False,(255,255,255)),(0,height-30))
         for event in pygame.event.get():  #从Pygame的事件队列中取出事件，并从队列中删除该事件
-            mainmenu.tackle_event(event,delta_time)
             if event.type == pygame.QUIT:  #获得事件类型，并逐类响应
                 _lock=False
-                sys.exit(0)
+                break
             elif event.type==pygame.MOUSEMOTION:
                 if selmode=='line2':
                     #确定方向
@@ -525,12 +470,30 @@ if __name__=='__main__':
                 msebtn=pygame.mouse.get_pressed()
                 if not msebtn[1]:
                     dragging=False
-            elif event.type==pygame.WINDOWRESIZED:
+            elif event.type==pygame.VIDEORESIZE:
                 #重新设置画布大小
-                size=width,height=(tkroot.winfo_width(),tkroot.winfo_height())
-                buffer=pygame.display.set_mode(size)
-                screen=pygame.display.set_mode(size)
-                status_bar.lift()
+                size=width,height=(event.w,event.h)
+                screen=pygame.display.set_mode(size,pygame.RESIZABLE)
+                buffer=pygame.Surface(size)
+            elif event.type==pygame.KEYUP:
+                if event.key in [pygame.K_LCTRL,pygame.K_RCTRL]:
+                    ctrl=False
+            elif event.type==pygame.KEYDOWN:
+                if event.key in [pygame.K_LCTRL,pygame.K_RCTRL]:
+                    ctrl=True
+                #hot keys
+                #need control
+                if ctrl:
+                    for htk,f in hot_key_map['ctrl'].items():
+                        if htk==event.key:
+                            #hotkey
+                            f()
+                #single keys
+                for htk,f in hot_key_map['single'].items():
+                        if htk==event.key:
+                            #hotkey
+                            f()
+            mainmenu.tackle_event(event,delta_time)
             ui_manager.process_events(event)
         #绘制鼠标上面的内容
         if selmode=='gate':
@@ -556,5 +519,5 @@ if __name__=='__main__':
         ui_manager.draw_ui(buffer)
         screen.blit(buffer,(0,0))
         pygame.display.flip()  #对显示窗口进行更新，默认窗口全部重绘
-        tkroot.update()
+        # tkroot.update()
 

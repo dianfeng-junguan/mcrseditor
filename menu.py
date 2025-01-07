@@ -72,3 +72,5 @@ class MenuBar:
                     text=event.text
                     i.options[text]()
                     break
+        elif event.type==pygame.VIDEORESIZE:
+            self.ui.rect.width=event.w
