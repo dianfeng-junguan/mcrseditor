@@ -2,10 +2,14 @@ import pygame,sys #sys是python的标准库，提供Python运行时环境变量�
 import threading
 import json
 import copy
+
+import pygame_gui.ui_manager
 import nbtrd
 import python_nbt.nbt as nbt
 import tkinter as tk
 import os
+import menu
+import pygame_gui
 from tkinter import filedialog
 from queue import Queue
 
@@ -412,8 +416,18 @@ if __name__=='__main__':
     screen = pygame.display.set_mode(size)  #初始化显示窗口
     buffer=pygame.Surface(size)
     font=pygame.font.SysFont("Arial",25)
+    ui_manager=pygame_gui.ui_manager.UIManager(size)
+
+    mainmenu=menu.MenuBar(width,ui_manager)
+    mainmenu.add_item('Files',{'Open':menuopen,'Save':menusave,'Export':menuexp})
+    mainmenu.add_item('Edit',{'Add':lambda :put_gate('and'),\
+                              'Or':lambda :put_gate('or'),\
+                                'Not': lambda :put_gate('not'),\
+                                    'Line':put_line})
+    clock=pygame.Clock()
     _lock=True
     while _lock:  #无限循环，直到Python运行时退出结束
+        delta_time=clock.tick(60)/1000
         buffer.fill((0,0,0))
         if not comm.empty():
             #有来自cmd的消息
@@ -479,6 +493,7 @@ if __name__=='__main__':
         #在左上角显示
         buffer.blit(font.render(txt_coordinate,False,(255,255,255)),(0,0))
         for event in pygame.event.get():  #从Pygame的事件队列中取出事件，并从队列中删除该事件
+            mainmenu.tackle_event(event,delta_time)
             if event.type == pygame.QUIT:  #获得事件类型，并逐类响应
                 _lock=False
                 sys.exit(0)
@@ -516,6 +531,7 @@ if __name__=='__main__':
                 buffer=pygame.display.set_mode(size)
                 screen=pygame.display.set_mode(size)
                 status_bar.lift()
+            ui_manager.process_events(event)
         #绘制鼠标上面的内容
         if selmode=='gate':
             cp_curpos=vsub(copy.deepcopy(curpos),render_origin)
@@ -536,6 +552,8 @@ if __name__=='__main__':
             st.pop(1)
             drawline(st+[length if not i else BLOCK_RENDERW,length if i else BLOCK_RENDERW])
                 
+        ui_manager.update(delta_time)
+        ui_manager.draw_ui(buffer)
         screen.blit(buffer,(0,0))
         pygame.display.flip()  #对显示窗口进行更新，默认窗口全部重绘
         tkroot.update()
