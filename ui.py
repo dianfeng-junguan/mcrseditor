@@ -332,8 +332,8 @@ def export(path:str):
                 rz=l if direction_index ==2 else startpos[2]
                 struct.setblock(rx,ry,  rz,1)
                 struct.setblock(rx,ry-1,rz,0)
-        with open(path,'wb') as f:
-            nbt.write_to_nbt_file(f,struct.get_nbt())
+        #must pass str path, otherwise it might cause problem
+        nbt.write_to_nbt_file(path,struct.get_nbt())
         print('done')
 
 def draw_gridline(stpos,enpos):
