@@ -89,7 +89,7 @@ def fill_subtask(x1,y1,z1,x2,y2,z2,type,struct:structure,semaphore:list):
 class blocks(enumerate):
     BLOCK_STONE=0
     BLOCK_REDSTONE=1
-    BLOCK_REPETITOR=2
+    BLOCK_REPEATOR=2
     BLOCK_REDSTONE_TORCH=3
     BLOCK_LEVER=4
 

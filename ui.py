@@ -145,7 +145,7 @@ def draw_gate(gate,rect,inmap=True):
         buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,vadd((10,10,0,0),render_origin+[0,0])))
     else:
         buffer.blit(font.render(gate,True,(255,255,255)),vadd(rect,(10,10,0,0)))
-def get_port_or_line(pos:list)->list:
+def get_obj_pos_at(pos:list)->list:
     '''
     returns the 3d position of the port or line at **pos**.
     returns None if there's nothing.
@@ -204,7 +204,7 @@ def deal_sel(curpos:tuple[int,int]):
         selmode=''
     elif selmode=='line1':
         global linep1
-        clicked_subject=get_port_or_line(block_pos)
+        clicked_subject=get_obj_pos_at(block_pos)
         linep1=[floored_pos[0]/BLOCK_RENDERW,1,floored_pos[1]/BLOCK_RENDERW]
         if not clicked_subject is None:
             linep1[1]=clicked_subject[1]#set y
@@ -218,7 +218,7 @@ def deal_sel(curpos:tuple[int,int]):
             linep2=[floored_pos[0]/BLOCK_RENDERW,1,linep1[2]]
         else:
             linep2=[linep1[0],1,floored_pos[1]/BLOCK_RENDERW]
-        clicked_subject=get_port_or_line(block_pos)
+        clicked_subject=get_obj_pos_at(block_pos)
         if not clicked_subject is None:
             linep2[1]=clicked_subject[1]#set y
         
@@ -274,6 +274,47 @@ def menunew():
 def menuexp():
     expf=filedialog.asksaveasfilename()
     export(expf)
+def get_object_at(pos:list):
+    '''
+    get the object at the 2d pos. \\
+    returns a line or a port in this way: \\
+    line:[x1,y1,z1,x2,y2,z2]
+    port:[x,y,z,type] (absolute pos)\\
+    returns None if finds nothing.
+    '''
+    #detect whether a port or a line is clicked
+    #gates
+    for sub in blkmap:
+        #gates
+        according_gate:dict=gates[sub['type']]
+        ports=according_gate['ports']
+        clicked_port=None
+        for p in ports:
+            abspos=vadd([p[0],p[2]],sub['rect'][:2])
+            rect_3d=sub['rect'][:2]
+            rect_3d.insert(1,0)
+            if pos==abspos:
+                #this port is clicked
+                return vadd(p,rect_3d)+p[3:]
+    #line
+    for c in conn:
+        #format of line data:[x1,y1,z1,x2,y2,z2]
+        direction='h'
+        if c[2]!=c[5]:
+            direction='v'
+        x1,y1,z1,x2,y2,z2=c[0],c[1],c[2],c[3],c[4],c[5]
+        if direction=='h' and pos[1]==c[2] and min(x1,x2)<=pos[0]<max(x1,x2) or \
+            direction=='v' and pos[0]==c[0] and min(z1,z2)<=pos[0]<max(z1,z2):
+            #match
+            #need to calculate the y at pos if the line is not in xOz
+            yv=y1
+            if not y1==y2:
+                #can only decrease up to one block per block
+                line_len=abs(x1-x2) if direction=='h' else abs(z1-z2)
+                k=(y1-y2)/line_len
+                yv=y1-int(k*((pos[0]-z1) if direction=='h' else (pos[1]-z1)))
+            return c
+    return None
 def export(path:str):
     #生成nbt
         nbtgates={"and":nbt.read_from_nbt_file('lib/nbt/and_2_1.nbt'),\
@@ -283,14 +324,40 @@ def export(path:str):
         #{'components':blkmap,'connections':conn}
         #blkmap:{"type":args[1],"rect":pos+gt['size']}
         all_palette=[]
-        all_palette=[struct.create_blockstate("minecraft:stone"),struct.create_blockstate("minecraft:redstone_wire",nbt.NBTTagCompound())]
+        all_palette=[struct.create_blockstate("minecraft:stone"),struct.create_blockstate("minecraft:redstone_wire",nbt.NBTTagCompound()),\
+                     struct.create_blockstate("minecraft:repeater",nbt.NBTTagCompound()),struct.create_blockstate("minecraft:repeater",nbt.NBTTagCompound()),\
+                        struct.create_blockstate("minecraft:repeater",nbt.NBTTagCompound()),struct.create_blockstate("minecraft:repeater",nbt.NBTTagCompound())]
         all_palette[1]['Properties']['power']=nbt.NBTTagInt(0)
         all_palette[1]['Properties']['north']=nbt.NBTTagString('none')
         all_palette[1]['Properties']['south']=nbt.NBTTagString('none')
         all_palette[1]['Properties']['east']= nbt.NBTTagString('none')
         all_palette[1]['Properties']['west']= nbt.NBTTagString('none')
+
+        all_palette[2]['Properties']['facing']=nbt.NBTTagString('west')
+        all_palette[2]['Properties']['delay']=nbt.NBTTagInt(1)
+        all_palette[2]['Properties']['locked']=nbt.NBTTagString('false')
+        all_palette[2]['Properties']['powered']=nbt.NBTTagString('false')
+        
+        all_palette[3]['Properties']['facing']=nbt.NBTTagString('east')
+        all_palette[3]['Properties']['delay']=nbt.NBTTagInt(1)
+        all_palette[3]['Properties']['locked']=nbt.NBTTagString('false')
+        all_palette[3]['Properties']['powered']=nbt.NBTTagString('false')
+        
+        all_palette[4]['Properties']['facing']=nbt.NBTTagString('north')
+        all_palette[4]['Properties']['delay']=nbt.NBTTagInt(1)
+        all_palette[4]['Properties']['locked']=nbt.NBTTagString('false')
+        all_palette[4]['Properties']['powered']=nbt.NBTTagString('false')
+        
+        all_palette[5]['Properties']['facing']=nbt.NBTTagString('south')
+        all_palette[5]['Properties']['delay']=nbt.NBTTagInt(1)
+        all_palette[5]['Properties']['locked']=nbt.NBTTagString('false')
+        all_palette[5]['Properties']['powered']=nbt.NBTTagString('false')
         struct.add_to_palette(nbtrd.blocks.BLOCK_STONE,struct.create_blockstate("minecraft:stone"))
         struct.add_to_palette(nbtrd.blocks.BLOCK_REDSTONE,all_palette[1])
+        struct.add_to_palette(nbtrd.blocks.BLOCK_REPEATOR,all_palette[2])
+        struct.add_to_palette(nbtrd.blocks.BLOCK_REPEATOR,all_palette[3])
+        struct.add_to_palette(nbtrd.blocks.BLOCK_REPEATOR,all_palette[4])
+        struct.add_to_palette(nbtrd.blocks.BLOCK_REPEATOR,all_palette[5])
         for sub in blkmap:
             '''
             获取nbt
@@ -319,9 +386,9 @@ def export(path:str):
                 #sub['rect'][1]
                 rz=sub['rect'][1]+bz
                 struct.setblock(rx,ry,rz,newi)
+        connected_sets=[]#sets of connected lines
         for lc in conn:
             #连接线
-            #TODO 添加中继器
             startpos,endpos=lc[0:3],lc[3:]
             #determine which index(direction) to extend
             direction_index=0 if startpos[0]!=endpos[0] else 2
@@ -332,9 +399,150 @@ def export(path:str):
                 rz=l if direction_index ==2 else startpos[2]
                 struct.setblock(rx,ry,  rz,1)
                 struct.setblock(rx,ry-1,rz,0)
+                #check if neighboring a line or port
+                side1=get_object_at([rx+int(direction_index/2),rz+1-int(direction_index/2)])
+                side2=get_object_at([rx-int(direction_index/2),rz-1+int(direction_index/2)])
+
+                side3=get_object_at([rx-1+int(direction_index/2),rz-int(direction_index/2)]) if l==startpos[direction_index] else None
+                side4=get_object_at([rx+1-int(direction_index/2),rz+int(direction_index/2)]) if l==endpos[direction_index]-1 else None
+                for set in connected_sets:
+                    if lc in set:
+                        #this line has been added
+                        break#choose this set
+                else:
+                    #has not been added
+                    set=[lc]
+                    connected_sets.append(set)
+                #adding neighbors into the set of lc
+                if not side1 is None and not side1 in set:
+                    set.append(side1)
+                if not side2 is None and not side2 in set:
+                    set.append(side2)
+                if not side3 is None and not side3 in set:
+                    set.append(side3)
+                if not side4 is None and not side4 in set:
+                    set.append(side4)
+        #now the connected_sets should contain sets where lines or ports are connected to each other
+        #but not across the sets
+        #put repeaters
+        for set in connected_sets:
+            pouts=[]
+            pins=[]
+            lines=[]
+            tmpmap=ConMap()
+            #classification
+            for e in set:
+                if isinstance(e[3],str):
+                    if e[3]=='out':
+                        pouts.append(e)
+                        tmpmap.addport(e[:3],'out')
+                    else:
+                        pins.append(e)
+                        tmpmap.addport(e[:3],'in')
+                else:
+                    tmpmap.addline(e)
+                    lines.append(e)
+            for outport in pouts:
+                #for each outport, we find a way to every inport connected
+                outport:list
+                ways=[]
+                #bfs
+                buf=[outport.copy()+[-1]]#the last element is the parent index
+                bufi=0
+                cpos=outport
+                def _bfs_bufcontains(pos):
+                    for b in buf:
+                        if b[:3]==pos:
+                            return True
+                    return False
+                while bufi<len(buf):
+                    cpos=buf[bufi]
+                    for d in [[0,0,-1],[0,0,1],[0,-1,0],[0,1,0],[-1,0,0],[1,0,0]]:
+                        newpos=vadd(cpos,d)
+                        if tmpmap.isinput(newpos):
+                            #found an inport, save the path
+                            ptr=cpos
+                            ways.append([])
+                            while ptr[-1]!=-1:
+                                ways[-1].insert(0,ptr)
+                                ptr=buf[ptr[-1]]
+                        elif tmpmap.walkable(newpos) and not _bfs_bufcontains(newpos):
+                            buf.append(newpos+[bufi])
+                    bufi+=1
+                #now we have paths from outport to inports. now check redstone power
+                REDSTONE_FULLPOWER=15
+                for pp in ways:
+                    power=REDSTONE_FULLPOWER
+                    i=0
+                    while i<len(pp):
+                        if power==0:
+                            #time to put a repeator
+                            while i>=0 and not tmpmap.can_place_repeater(pp[i]):
+                                i-=1
+                            if i==-1:
+                                #TODO nowhere to place
+                                print('err: there\'s one or more path(s) that cannot be put with repeator. however, the exportation can still continue.')
+                                break
+                            tmpmap.put_repeater(pp[i])
+                            #TODO need to set the facing of repeator
+                            prev=pp[i-1]
+                            vdelta=vsub(pp[i],prev)
+                            if vdelta[2]<0:#west
+                                idelta_of_dir=0
+                            if vdelta[2]>0:#east
+                                idelta_of_dir=1
+                            elif vdelta[0]<0:#north
+                                idelta_of_dir=2
+                            elif vdelta[0]>0:#south
+                                idelta_of_dir=3
+                            struct.setblock(pp[i][0],pp[i][1],pp[i][2],nbtrd.blocks.BLOCK_REPEATOR+idelta_of_dir)
+                            power=REDSTONE_FULLPOWER#restore
+                        if tmpmap.is_repeater(pp[i]):
+                            power=REDSTONE_FULLPOWER
+                        else:
+                            power-=1
+                        i+=1
         #must pass str path, otherwise it might cause problem
         nbt.write_to_nbt_file(path,struct.get_nbt())
         print('done')
+class ConMap:
+    '''
+    a map to help placing repeaters.
+    '''
+    def __init__(self):
+        self.objs=[]
+        pass
+    def addport(self,pos,type):
+        self.objs.append(['port',type,pos])
+    def addline(self,line):
+        self.objs.append(['line',line])
+    def isinput(self,pos):
+        for e in self.objs:
+            if e[0]=='port' and e[2]==pos and e[1]=='in':
+                return True
+        return False
+    def walkable(self,pos):
+        for e in self.objs:
+            if e[0]=='line' and (e[1][0]<=pos[0]<e[1][3] or e[1][0]==pos[0]==e[1][3]) \
+            and (e[1][1]<=pos[1]<e[1][4] or e[1][1]==pos[1]==e[1][4]) and (e[1][2]<=pos[2]<e[1][5] or e[1][2]==pos[2]==e[1][5]):
+                return True
+        return False
+    def can_place_repeater(self,pos):
+        #check crossroads
+        if not self.walkable(pos):
+            return False#pos is not even in a line
+        direction='h' if e[0]!=e[3] else 'v'
+        if direction=='v' and (not self.walkable(vadd(pos,[-1,0,0])) and not self.walkable(vadd(pos,[1,0,0])))\
+        or direction=='h' and (not self.walkable(vadd(pos,[0,0,-1])) and not self.walkable(vadd(pos,[0,0,1]))): 
+            return True
+        return False
+    def put_repeater(self,pos):
+        self.objs.append(['repeater',pos])
+    def is_repeater(self,pos):
+        for e in self.objs:
+            if e[0]=='repeater' and e[1]==pos:
+                return True
+        return False
 
 def draw_gridline(stpos,enpos):
     #考虑相对坐标
@@ -518,6 +726,5 @@ if __name__=='__main__':
         ui_manager.update(delta_time)
         ui_manager.draw_ui(buffer)
         screen.blit(buffer,(0,0))
-        pygame.display.flip()  #对显示窗口进行更新，默认窗口全部重绘
-        # tkroot.update()
+        pygame.display.flip()
 
