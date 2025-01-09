@@ -763,6 +763,9 @@ if __name__=='__main__':
             if length<0:
                 length=-length
                 st[i]-=length
+                length+=BLOCK_RENDERW
+            elif length==0:
+                length=BLOCK_RENDERW
             st.pop(1)
             drawline(st+[length if not i else BLOCK_RENDERW,length if i else BLOCK_RENDERW])
                 
