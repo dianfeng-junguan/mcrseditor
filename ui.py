@@ -225,6 +225,26 @@ def deal_sel(curpos:tuple[int,int]):
         addline(linep1,linep2)
         selmode=''
         linedir=''
+    elif selmode=='del':
+        #delete
+        #check gate
+        todel=get_gate_at(block_pos)
+        if not todel is None:
+            blkmap.remove(todel)
+            return
+        #lines
+        todel=get_object_at(block_pos)
+        if len(todel)>3:#line, not port
+            conn.remove(todel)
+def get_gate_at(pos:list):
+    '''
+    get the list item in the blkmap(gate) at 2d pos.
+    '''
+    global blkmap
+    for i in range(len(blkmap)):
+        if inarea(pos,blkmap[i]['rect'][:2],blkmap[i]['rect'][2:]):
+            return blkmap[i]
+    return None
 def addline(p1,p2):
     '''
     add a line.
@@ -258,18 +278,22 @@ def put_line():
 def menuopen():
     path=filedialog.askopenfilename()
     pygame.display.set_caption(DEFAULT_TITLE+" %s"%(path))
+    set_status_bar(path)
     openf(path)
 def menusave():
     global curf
     if len(curf)==0:
         curf=filedialog.asksaveasfilename()
     pygame.display.set_caption(DEFAULT_TITLE+" %s"%(curf))
+    set_status_bar('saved')
     savef(curf)
 def menunew():
     global curf,selmode
     curf=''
     blkmap.clear()
     conn.clear()
+    set_status_bar('Untitled')
+    pygame.display.set_caption(DEFAULT_TITLE)
     selmode=''
 def menuexp():
     expf=filedialog.asksaveasfilename()
@@ -402,7 +426,7 @@ def export(path:str):
                 #check if neighboring a line or port
                 side1=get_object_at([rx+int(direction_index/2),rz+1-int(direction_index/2)])
                 side2=get_object_at([rx-int(direction_index/2),rz-1+int(direction_index/2)])
-
+                #3 and 4 are used to detect extra points at two ends
                 side3=get_object_at([rx-1+int(direction_index/2),rz-int(direction_index/2)]) if l==startpos[direction_index] else None
                 side4=get_object_at([rx+1-int(direction_index/2),rz+int(direction_index/2)]) if l==endpos[direction_index]-1 else None
                 for set in connected_sets:
@@ -484,7 +508,6 @@ def export(path:str):
                                 print('err: there\'s one or more path(s) that cannot be put with repeator. however, the exportation can still continue.')
                                 break
                             tmpmap.put_repeater(pp[i])
-                            #TODO need to set the facing of repeator
                             prev=pp[i-1]
                             vdelta=vsub(pp[i],prev)
                             if vdelta[2]<0:#west
@@ -550,16 +573,20 @@ def draw_gridline(stpos,enpos):
 def clear_selmode():
     global selmode
     selmode=''
-
-def window_end():
-    global _lock
-    _lock=False
-    pygame.quit()
-    sys.exit(0)
+def set_status_bar(text:str):
+    '''
+    set content of status bar.
+    '''
+    global status_bar_text
+    status_bar_text=text
+def delete_mode():
+    global selmode
+    selmode='del'
 if __name__=='__main__':
     DEFAULT_TITLE="Minecraft Redstone Designer"
     selmode=''
     selgate=''
+    status_bar_text='Untitled'
     #the starting and ending points of a line to be added in block pos.
     linep1,linep2=[0,0,0],[0,0,0]
     linedir='h'
@@ -577,13 +604,15 @@ if __name__=='__main__':
             pygame.K_o:menuopen,
             pygame.K_s:menusave,
             pygame.K_e:menuexp,
+            pygame.K_n:menunew
         },
         'single':{
             pygame.K_q:lambda :put_gate('and'),
             pygame.K_w:lambda :put_gate('or'),
             pygame.K_e:lambda :put_gate('not'),
             pygame.K_r:put_line,
-            pygame.K_ESCAPE:clear_selmode
+            pygame.K_ESCAPE:clear_selmode,
+            pygame.K_DELETE:delete_mode
         }   
     }
     screen = pygame.display.set_mode(size,pygame.RESIZABLE)  #初始化显示窗口
@@ -592,11 +621,12 @@ if __name__=='__main__':
     ui_manager=pygame_gui.ui_manager.UIManager(size)
 
     mainmenu=menu.MenuBar(width,ui_manager)
-    mainmenu.add_item('Files',{'Open ctrl+o':menuopen,'Save ctrl+s':menusave,'Export ctrl+e':menuexp})
+    mainmenu.add_item('Files',{'New ctrl+n':menunew,'Open ctrl+o':menuopen,'Save ctrl+s':menusave,'Export ctrl+e':menuexp})
     mainmenu.add_item('Edit',{'Add q':lambda :put_gate('and'),\
                               'Or w':lambda :put_gate('or'),\
                                 'Not e': lambda :put_gate('not'),\
-                                    'Line r':put_line})
+                                    'Line r':put_line,\
+                                    'Remove delete':delete_mode})
     clock=pygame.Clock()
     _lock=True
     while _lock:  #无限循环，直到Python运行时退出结束
@@ -639,11 +669,12 @@ if __name__=='__main__':
             del conrect
         curpos=pygame.mouse.get_pos()
         #在状态栏显示鼠标所处的方块坐标
-        curpos_toblkpos=[e/BLOCK_RENDERW for e in vsub(copy.deepcopy(curpos),render_origin)]
+        curpos_toblkpos=[int(e/BLOCK_RENDERW) for e in vsub(copy.deepcopy(curpos),render_origin)]
         txt_coordinate="(%d,%d)"%(curpos_toblkpos[0],curpos_toblkpos[1])
         if linedir in ['h','v']:
             txt_coordinate+=',%s'%(linedir)
-        # status_label.config(text=txt_coordinate)
+        #draw status bar
+        buffer.blit(font.render(status_bar_text,False,(255,255,255)),(0,height-60))
         #在左上角显示
         buffer.blit(font.render(txt_coordinate,False,(255,255,255)),(0,height-30))
         for event in pygame.event.get():  #从Pygame的事件队列中取出事件，并从队列中删除该事件
@@ -651,6 +682,18 @@ if __name__=='__main__':
                 _lock=False
                 break
             elif event.type==pygame.MOUSEMOTION:
+                set_status_bar(selgate if selmode=='gate' else selmode)
+                if selmode in ['gate','line1','line2']:
+                    #trying to place something
+                    #check whether the place hovered is placable
+                    if selmode[:4]=='line':
+                        needsize=[1,1]
+                    else:
+                        needsize=gates[selgate]['size']
+                    if selmode=='gate' and not available(curpos_toblkpos,needsize) or not get_object_at(curpos_toblkpos) is None:
+                        set_status_bar('cannot place object here: already occupied')
+                    else:
+                        set_status_bar(selgate if selmode=='gate' else selmode)
                 if selmode=='line2':
                     #确定方向
                     cp_curpos=vsub(copy.deepcopy(curpos),render_origin)
