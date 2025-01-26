@@ -9,3 +9,7 @@ schema.py
 termin.py
 *.e
 unused
+
+LICENSE
+
+examples

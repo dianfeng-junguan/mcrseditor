@@ -114,7 +114,7 @@ def solve(cmd:str):
         export(args[1])
 
 #加载门电路库
-with open('gates.json','r') as f:
+with open('lib/gates.json','r') as f:
     global gates
     gates=json.load(f)
 if len(sys.argv)>1:
