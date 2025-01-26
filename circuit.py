@@ -39,8 +39,9 @@ class Point2D:
 class SelectMode(Enum):
     NONE=0
     GATE = 1
-    WIRE = 2
-    DELETE=3
+    WIRE_START = 2
+    WIRE_END = 3
+    DELETE=4
 class Selection:
     def __init__(self, mode:SelectMode=SelectMode.NONE,items=[]):
         self.mode = mode
@@ -57,6 +58,15 @@ class Circuit:
 
     def add_gate(self, position,gate:Gate):
         self.gates.append([position, gate])
+    def add_wire(self, start, end):
+        self.wires.append([start, end])
+    def remove_gate(self, gate):
+        self.gates.remove(gate)
+    def remove_wire(self, wire):
+        self.wires.remove(wire)
+    def clear(self):
+        self.gates.clear()
+        self.wires.clear()
     def to_dict(self):
         return {"gates": self.gates, "wires": self.wires}
 class RenderConfig:
@@ -165,6 +175,8 @@ class GraphicsView(QtWidgets.QGraphicsView):
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.middleMouseButtonPressed = False
         self.gate_item = None
+        self.selected_wire_start_item = None
+        self.selected_wire_item = None
         self.setMouseTracking(True)
 
     def setPrivateSceneProperty(self, scene):
@@ -189,6 +201,56 @@ class GraphicsView(QtWidgets.QGraphicsView):
             self.gate_item = GateItem(Point2D(int(grid_pos.x), int(grid_pos.y)), gate_info=select.items[0])
             self.__scene.addItem(self.gate_item)
             event.accept()
+        elif select.mode == SelectMode.WIRE_START:
+            #正在选择线路的起点，只显示一个大小的矩形
+            if self.selected_wire_start_item:
+                self.__scene.removeItem(self.selected_wire_start_item)
+            # 对齐到最近的网格点
+            proto_pos=event.position()
+            mapped_pos=self.mapToScene(int(proto_pos.x()), int(proto_pos.y()))
+            grid_pos = self.snap_to_grid(mapped_pos)
+            select.items[0] = Point2D(int(grid_pos.x), int(grid_pos.y))
+            self.selected_wire_start_item = QtWidgets.QGraphicsRectItem(QtCore.QRectF(select.items[0].x, select.items[0].y, render_config.grid_spacing, render_config.grid_spacing))
+            self.selected_wire_start_item.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 2, QtCore.Qt.PenStyle.SolidLine))
+            self.selected_wire_start_item.setBrush(QtGui.QColor(0, 0, 0))
+            self.__scene.addItem(self.selected_wire_start_item)
+            event.accept()
+        elif select.mode == SelectMode.WIRE_END:
+            if self.selected_wire_start_item:
+                self.__scene.removeItem(self.selected_wire_start_item)
+                self.selected_wire_start_item = None
+            if self.selected_wire_item:
+                self.__scene.removeItem(self.selected_wire_item)
+                self.selected_wire_item = None
+            #，从起点绘制到终点一条一格粗的线，这一条线只能是水平的或者竖直的，至于方向是由鼠标位置相对开始点的位移决定的
+            proto_pos=event.position()
+            mapped_pos=self.mapToScene(int(proto_pos.x()), int(proto_pos.y()))
+            grid_pos = self.snap_to_grid(mapped_pos)
+            start_pos = select.items[0]
+            end_pos = Point2D(int(grid_pos.x), int(grid_pos.y))
+            #根据相对位移得出是水平还是竖直的线
+            if abs(grid_pos.x - start_pos.x) > abs(grid_pos.y - start_pos.y):
+                #水平线
+                end_pos = Point2D(int(grid_pos.x), int(start_pos.y))
+            else:
+                #竖直线
+                end_pos = Point2D(int(start_pos.x), int(grid_pos.y))
+            select.items[1]=end_pos
+            #有的时候方向会向负方向，这样就需要修改start_pos和end_pos的位置
+            #同时，负方向的时候，起点就没有被考虑在内，需要加上一个网格大小
+            if end_pos.x < start_pos.x or end_pos.y < start_pos.y:
+                start_pos, end_pos = end_pos, start_pos
+                #FIXME 这里不正确，画出来会很长很长，一动还会变长
+                # end_pos.x += render_config.grid_spacing
+            #计算线大小
+            size = [max(render_config.grid_spacing,abs(end_pos.x - start_pos.x)), max(render_config.grid_spacing,abs(end_pos.y - start_pos.y))]
+            #向__scene添加rectitem来实现绘制直线
+            rect = QtCore.QRectF(start_pos.x, start_pos.y, size[0], size[1])
+            self.selected_wire_item =QtWidgets.QGraphicsRectItem(rect)
+            self.selected_wire_item.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 2, QtCore.Qt.PenStyle.SolidLine))
+            self.selected_wire_item.setBrush(QtGui.QColor(0, 0, 0))
+            self.__scene.addItem(self.selected_wire_item)
+            event.accept()
         elif self.middleMouseButtonPressed and event.buttons() & QtCore.Qt.MouseButton.MiddleButton:
             delta = event.position() - self.middleMouseButtonPressPosition
             # render_config.render_origin += Point2D(delta.x(), delta.y())
@@ -202,8 +264,8 @@ class GraphicsView(QtWidgets.QGraphicsView):
             # 对齐到最近的网格点
             proto_pos=event.position()
             mapped_pos=self.mapToScene(int(proto_pos.x()), int(proto_pos.y()))
-            grid_pos = self.snap_to_grid(mapped_pos)
-            final_pos=Point2D(int(grid_pos.x), int(grid_pos.y))
+            end_pos = self.snap_to_grid(mapped_pos)
+            final_pos=select.items[1]#Point2D(int(grid_pos.x), int(grid_pos.y))
             self.gate_item = GateItem(final_pos)
             current_circuit.add_gate(final_pos,Gate(select.items[0].name,select.items[0].size,select.items[0].ports))
             # self.__scene.removeItem(self.gate_item)
@@ -211,6 +273,18 @@ class GraphicsView(QtWidgets.QGraphicsView):
             select.mode = SelectMode.NONE
             # self.refresh_display()
             event.accept()
+        elif select.mode == SelectMode.WIRE_START:
+            select.mode = SelectMode.WIRE_END
+            self.selected_wire_item = None
+        elif select.mode == SelectMode.WIRE_END:
+            #应该添加线路到current_circuit
+            start_pos = select.items[0]
+            end_pos = select.items[1]
+            if end_pos.x < start_pos.x or end_pos.y < start_pos.y:
+                start_pos, end_pos = end_pos, start_pos
+            current_circuit.add_wire(start_pos, end_pos)
+            select.mode = SelectMode.NONE
+            select.items.clear()
         elif event.button() == QtCore.Qt.MouseButton.MiddleButton:
             self.middleMouseButtonPressed = False
         super().mouseReleaseEvent(event)
@@ -370,7 +444,13 @@ class Ui_MainWindow(object):
 
     def draw_wire(self, wire):
         #绘制线路
-        pass
+        start_pos = wire[0]
+        end_pos = wire[1]
+        rect = QtCore.QRectF(start_pos.x, start_pos.y, max(render_config.grid_spacing,abs(end_pos.x - start_pos.x)), max(render_config.grid_spacing,abs(end_pos.y - start_pos.y)))
+        rectitem=QtWidgets.QGraphicsRectItem(rect)
+        rectitem.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 2, QtCore.Qt.PenStyle.SolidLine))
+        rectitem.setBrush(QtGui.QColor(0, 0, 0))
+        self.scene.addItem(rectitem)
     def save_circuit(self):
         # 以json格式保存电路
         if not opened_circuit:  # 还没选定保存路径，先弹出文件选择窗口选择保存路径
@@ -471,7 +551,10 @@ class Ui_MainWindow(object):
 
     def add_wire(self):
         #更新选择模式
-        select.mode=SelectMode.WIRE
+        select.mode=SelectMode.WIRE_START
+        select.items.clear()
+        select.items.append(Point2D(0,0))
+        select.items.append(Point2D(0,0))
         #刷新显示    
         self.refresh_display()
 
