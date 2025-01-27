@@ -13,6 +13,10 @@ class Gate:
         self.name = name
         self.size = size
         self.ports = ports
+    def from_dict(d):
+        return Gate(d['name'], d['size'], d['ports'])
+    def to_dict(self):
+        return {'name': self.name,'size': self.size, 'ports': self.ports}
 class Ui_GateSelectMainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")

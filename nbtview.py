@@ -6,6 +6,7 @@ from direct.task import Task
 from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import WindowProperties
 from panda3d.core import LPoint3f
+import sys
 class NBTPreviewer(ShowBase):
     def __init__(self, nbt_file_path):
         ShowBase.__init__(self)# 新增一个变量来标记鼠标是否锁定
@@ -229,6 +230,6 @@ class NBTPreviewer(ShowBase):
 
 
 if __name__ == "__main__":
-    nbt_file_path = 'examples/RSlocker.nbt'  # 替换为你的 NBT 文件路径
+    nbt_file_path = sys.argv[1] if len(sys.argv) > 1 else 'examples/RSlocker.nbt'  # 替换为你的 NBT 文件路径
     app = NBTPreviewer(nbt_file_path)
     app.run()

@@ -1,0 +1,98 @@
+{
+    "circuit": {
+        "gates": [
+            {
+                "position": [
+                    5,
+                    6
+                ],
+                "gate": {
+                    "name": "and",
+                    "size": [
+                        3,
+                        4
+                    ],
+                    "ports": [
+                        [
+                            0,
+                            2,
+                            3,
+                            "in"
+                        ],
+                        [
+                            2,
+                            2,
+                            3,
+                            "in"
+                        ],
+                        [
+                            2,
+                            1,
+                            0,
+                            "out"
+                        ]
+                    ]
+                }
+            },
+            {
+                "position": [
+                    12,
+                    6
+                ],
+                "gate": {
+                    "name": "or",
+                    "size": [
+                        3,
+                        3
+                    ],
+                    "ports": [
+                        [
+                            0,
+                            1,
+                            2,
+                            "in"
+                        ],
+                        [
+                            2,
+                            1,
+                            2,
+                            "in"
+                        ],
+                        [
+                            1,
+                            1,
+                            0,
+                            "out"
+                        ]
+                    ]
+                }
+            }
+        ],
+        "wires": [
+            {
+                "start": [
+                    7,
+                    5
+                ],
+                "end": [
+                    14,
+                    5
+                ]
+            }
+        ]
+    },
+    "select": {
+        "mode": 0,
+        "items": []
+    },
+    "render_config": {
+        "render_origin": [
+            -9.0,
+            -69.0
+        ],
+        "render_scale": 1.0,
+        "grid_num_rows": 48,
+        "grid_num_cols": 48,
+        "grid_spacing": 30
+    }
+}
