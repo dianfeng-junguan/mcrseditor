@@ -6,21 +6,25 @@ It provides a Gui to place gates and wires to build circuits and you can export 
 
 It is still a immature project. The codes are still in a mess and many bugs are yet to be solved, yet it already is capable of converting circuit into valid nbt file smaller than 48\*48\*48 that can be actually generated in Minecraft.
 
-This project needs **python_nbt** and **pygame_gui**.
+This project requires **pyqt6** and **python_nbt**. You can install them by running:
+
+```bash
+pip install pyqt6 python_nbt
+```
 
 ## Files
 
-**ui.py**
+**circuit.py**
 
 The core of the project. Run it and you can see the editor.
 
 **nbtrd.py**
 
-Nbt operations. **ui.py** uses this file to do nbt operations.
+Nbt operations. **circuit.py** uses this file to do nbt operations.
 
 **menu.py**
 
-The definition of the Menu widget.
+*(Unused)* The definition of the Menu widget.
 
 **editor.py**
 
