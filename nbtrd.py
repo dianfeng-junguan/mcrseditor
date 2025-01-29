@@ -1,6 +1,84 @@
 import python_nbt.nbt as nbt
 import threading
 import multiprocessing
+
+def createBlockState(name:str,properties:nbt.NBTTagCompound=None)->nbt.NBTTagCompound:
+    state=nbt.NBTTagCompound()
+    state['Name']=nbt.NBTTagString(name)
+    if not (properties is None):
+        state['Properties']=properties
+    return state
+class NBTStructure:
+    def __init__(self,x=48,y=48,z=48):
+        '''
+        初始化一个nbt结构，默认大小为48*48*48，会生成默认的palette
+        '''
+        self.blocks=[]
+        self.palette=[]
+        self.size=[x,y,z]
+        #设置默认的palette
+        all_palette=[]
+        all_palette=[createBlockState("minecraft:stone"),createBlockState("minecraft:redstone_wire",nbt.NBTTagCompound()),\
+                    createBlockState("minecraft:repeater",nbt.NBTTagCompound()),createBlockState("minecraft:repeater",nbt.NBTTagCompound()),\
+                        createBlockState("minecraft:repeater",nbt.NBTTagCompound()),createBlockState("minecraft:repeater",nbt.NBTTagCompound())]
+        all_palette[1]['Properties']['power']=nbt.NBTTagInt(0)
+        all_palette[1]['Properties']['north']=nbt.NBTTagString('none')
+        all_palette[1]['Properties']['south']=nbt.NBTTagString('none')
+        all_palette[1]['Properties']['east']= nbt.NBTTagString('none')
+        all_palette[1]['Properties']['west']= nbt.NBTTagString('none')
+        all_palette[2]['Properties']['facing']=nbt.NBTTagString('west')
+        all_palette[2]['Properties']['delay']=nbt.NBTTagInt(1)
+        all_palette[2]['Properties']['locked']=nbt.NBTTagString('false')
+        all_palette[2]['Properties']['powered']=nbt.NBTTagString('false')
+        
+        all_palette[3]['Properties']['facing']=nbt.NBTTagString('east')
+        all_palette[3]['Properties']['delay']=nbt.NBTTagInt(1)
+        all_palette[3]['Properties']['locked']=nbt.NBTTagString('false')
+        all_palette[3]['Properties']['powered']=nbt.NBTTagString('false')
+        
+        all_palette[4]['Properties']['facing']=nbt.NBTTagString('north')
+        all_palette[4]['Properties']['delay']=nbt.NBTTagInt(1)
+        all_palette[4]['Properties']['locked']=nbt.NBTTagString('false')
+        all_palette[4]['Properties']['powered']=nbt.NBTTagString('false')
+        
+        all_palette[5]['Properties']['facing']=nbt.NBTTagString('south')
+        all_palette[5]['Properties']['delay']=nbt.NBTTagInt(1)
+        all_palette[5]['Properties']['locked']=nbt.NBTTagString('false')
+        all_palette[5]['Properties']['powered']=nbt.NBTTagString('false')
+        self.add_to_palette(blocks.BLOCK_STONE,createBlockState("minecraft:stone"))
+        self.add_to_palette(blocks.BLOCK_REDSTONE,all_palette[1])
+        self.add_to_palette(blocks.BLOCK_REPEATOR,all_palette[2])
+        self.add_to_palette(blocks.BLOCK_REPEATOR,all_palette[3])
+        self.add_to_palette(blocks.BLOCK_REPEATOR,all_palette[4])
+        self.add_to_palette(blocks.BLOCK_REPEATOR,all_palette[5])
+    def set_block(self,x:int,y:int,z:int,type:int):
+        #查重
+        for b in self.blocks:
+            if b['pos']==[x,y,z]:
+                self.blocks.remove(b)
+        self.blocks.append({'pos':[x,y,z],'state':type})
+    def add_to_palette(self,index:int,blockstate:nbt.NBTTagCompound)->None:
+        self.palette.insert(index,blockstate)
+    def resize(self,x,y,z):
+        self.size=[x,y,z]
+    def get_type(self,name:str)->int:
+        return self.palette.index(name)
+    def get_nbt(self)->nbt.NBTTagCompound:
+        data=nbt.NBTTagCompound()
+        data['blocks']=nbt.NBTTagList(tag_type=nbt.NBTTagCompound)
+        for b in self.blocks:
+            # {'pos':nbt.NBTTagList(value=list(map(lambda x:nbt.NBTTagInt(x),b['pos'])),tag_type=nbt.NBTTagInt),\
+            #                                           'state':nbt.NBTTagInt(b['state'])}
+            toappend=nbt.NBTTagCompound()
+            toappend['pos']=nbt.NBTTagList(value=list(map(lambda x:nbt.NBTTagInt(x),b['pos'])),tag_type=nbt.NBTTagInt)
+            toappend['state']=nbt.NBTTagInt(b['state'])
+            data['blocks'].append(toappend)
+        data['palettes']=nbt.NBTTagList(tag_type=nbt.NBTTagList)
+        data['palettes'].append(nbt.NBTTagList(tag_type=nbt.NBTTagCompound))
+        for p in self.palette:
+            data['palettes'][0].append(p)
+        data['size']=nbt.NBTTagList(value=list(map(lambda x:nbt.NBTTagInt(x),self.size)),tag_type=nbt.NBTTagInt)
+        return data
 class structure:
     def __init__(self,x=48,y=48,z=48):
         self.data=nbt.NBTTagCompound()
@@ -78,6 +156,7 @@ class structure:
             t.start()
         while finished[0]<threadc:
             pass
+    
 def fill_subtask(x1,y1,z1,x2,y2,z2,type,struct:structure,semaphore:list):
     for x in range(x1,x2):
         for y in range(y1,y2):
@@ -92,4 +171,20 @@ class blocks(enumerate):
     BLOCK_REPEATOR=2
     BLOCK_REDSTONE_TORCH=3
     BLOCK_LEVER=4
-
+""" if __name__=='__main__':
+    #测试NBTStructure
+    n=NBTStructure()
+    n.set_block(0,0,0,0)
+    n.set_block(1,1,1,1)
+    n.set_block(2,2,2,2)
+    n.set_block(3,3,3,3)
+    n.set_block(4,4,4,4)
+    n.set_block(5,5,5,5)
+    n.set_block(6,6,6,6)
+    n.set_block(7,7,7,7)
+    n.set_block(8,8,8,8)
+    n.set_block(9,9,9,9)
+    n.set_block(10,10,10,10)
+    n.set_block(11,11,11,11)
+    n.set_block(12,12,12,12)
+    nbt.write_to_nbt_file('test.nbt',n.get_nbt()) """
