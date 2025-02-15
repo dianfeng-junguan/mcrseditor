@@ -18,6 +18,7 @@ class Gate:
     def to_dict(self):
         return {'name': self.name,'size': self.size, 'ports': self.ports}
 class Ui_GateSelectMainWindow(object):
+    gates={}
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(637, 419)
@@ -62,7 +63,7 @@ class Ui_GateSelectMainWindow(object):
         self.okButton.clicked.connect(self.on_ok_clicked)
 
         self.model=QtGui.QStandardItemModel(self.listView)
-        self.gates={}
+        # self.gates={}
         self.read_gates()
         self.grid_size=30
         self.selected_gate = None
@@ -94,6 +95,12 @@ class Ui_GateSelectMainWindow(object):
             self.model.appendRow(item)
         self.listView.setModel(self.model)
     
+    def load_gate_data(self):
+        #从gates.json中读取门电路信息
+        with open('lib/gates.json', 'r', encoding='utf-8') as f:
+            gates = json.load(f)
+            self.gates = gates
+    
     def on_list_selected(self, index):
         item = self.model.itemFromIndex(index)
         if item is None:
@@ -110,6 +117,7 @@ class Ui_GateSelectMainWindow(object):
         rect=QtWidgets.QGraphicsRectItem(0, 0, wire[0]*self.grid_size, wire[1]*self.grid_size)
         rect.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 2))
         scene.addItem(rect)
+        # scene.setSceneRect(0, 0, wire[0]*self.grid_size*3//2, wire[1]*self.grid_size*3//2)
         #画端点
 
         for port in self.gates[gate_name]['ports']:
@@ -117,6 +125,9 @@ class Ui_GateSelectMainWindow(object):
             point.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 2))
             point.setBrush(QtGui.QBrush(QtGui.QColor(0, 255, 255)))
             scene.addItem(point)
+            
+        #如果整个大小超过了画布大小，则缩放画布
+        self.graphicsView.fitInView(scene.itemsBoundingRect(), QtCore.Qt.AspectRatioMode.KeepAspectRatio)
         self.graphicsView.setScene(scene)
     
     def on_ok_clicked(self):
@@ -129,3 +140,6 @@ class Ui_GateSelectMainWindow(object):
         self.selected_gate = Gate(gate_name, self.gates[gate_name]['size'], self.gates[gate_name]['ports'])
         self.main_window.close()
 
+    def save_gates(self):
+        with open('lib/gates.json', 'w', encoding='utf-8') as f:
+            json.dump(self.gates, f, indent=4)
