@@ -328,7 +328,7 @@ class RedstoneCircuit:
         }
 
         return json.dumps(circuit_json, indent=4)
-
+""" 
 # 创建一个红石电路实例
 circuit = RedstoneCircuit()
 
@@ -354,4 +354,4 @@ json_output = circuit.export_json()
 with open('rs_latch_circuit.json', 'w') as f:
     f.write(json_output)
 
-print("RS锁存器电路已成功导出到 rs_latch_circuit.json 文件。")
+print("RS锁存器电路已成功导出到 rs_latch_circuit.json 文件。") """

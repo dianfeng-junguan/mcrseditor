@@ -565,6 +565,42 @@ render_config = RenderConfig()
 select=Selection()
 current_circuit=Circuit()
 #=================global variables end=
+
+def save_circuit(circ:Circuit,path:str):
+    # 直接将circuit以json格式保存电路，不经过可视化编辑
+    #设置render_config
+    render_config.render_origin=Point2D(0,0)
+    render_config.render_scale=1.0
+
+    # 已经有保存路径，直接保存
+    try:
+        with open(path, 'w') as f:
+            #使用json保存，因为Point2D不能序列化也不能直接json.dumps,所以要对每一个gates中的Point2D转换成字典
+            #然后再json.dumps
+            json.dump({"circuit":circ.to_dict(), "select":Selection().to_dict(), "render_config":render_config.to_dict()}, f,indent=4)
+        print("saved circuit")
+    except Exception as e:
+        print(f"保存电路时发生错误: {e}")
+        traceback.print_exc()
+def open_circuit(filename:str)->Circuit:
+    '''
+    直接加载json文件到全局变量中。
+    '''
+    circ:Circuit
+    if filename:
+        try:
+            with open(filename, 'rb') as f:
+                #因为json里面gates和wires都是用dict存储的，所以要每个dict表示的点转换成Point2D再存到current_circuit中
+                data=json.load(f)
+                circ.from_dict(data["circuit"])
+                select=Selection(**data["select"])
+                render_config=RenderConfig(**data["render_config"])
+            opened_circuit = filename
+        except Exception as e:
+            print(f"打开电路时发生错误: {e}")
+    else:
+        raise ValueError("未提供有效的文件路径")
+    return circ
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")

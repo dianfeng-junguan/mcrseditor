@@ -9,7 +9,17 @@
 from PyQt6 import QtCore, QtGui, QtWidgets
 import json
 class Gate:
-    def __init__(self, name, size, ports):
+    def __init__(self, name:str, size:list[int,int], ports:list[list[int,int,int,str]]):
+        '''
+        create a gate.
+
+        :param name:str: the name of the gate.
+
+        :param size:list[x:int,z:int]: the size of the gate.
+
+        :param ports:list[list[x:int,y:int,z:int,type:"in"|"out"]]: a list of tuples representing the ports of the gate. Each tuple contains two integers representing the x and y coordinates of the port, and two strings representing the type of the port (in or out).
+
+        '''
         self.name = name
         self.size = size
         self.ports = ports
