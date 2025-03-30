@@ -15,7 +15,7 @@ helpstr="cmds:\n\
     open [path]\n\
     help\n\
     show\n\
-    export [path] :export as ui.py project file\n\
+    export [path] :export as circuit.py project file\n\
     q/exit"
 def solve(cmd:str)->int:
     '''
